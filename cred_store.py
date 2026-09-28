@@ -15,7 +15,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 KEY_FILE = os.path.expanduser("~/.baixyn-api/cred_store.key")
 DATA_FILE = os.path.expanduser("~/.baixyn-api/cred_store.enc")
 AUDIT_LOG = os.path.join(BASE, "日志", "凭证访问.log")
-ADMIN_USERS = ["ziyu"]  # 只有这些账号可以访问凭证
+ADMIN_USERS = ["neo"]  # 只有这些账号可以访问凭证
 
 
 def _get_key():
@@ -88,5 +88,11 @@ def list_names():
 
 
 def is_admin(username):
-    """判断是否为管理员账号"""
-    return username in ADMIN_USERS
+    """判断是否为管理员账号（天枢账号 or 本地超管）"""
+    if username in ADMIN_USERS:
+        return True
+    try:
+        import local_accounts
+        return local_accounts.is_super_admin(username)
+    except Exception:
+        return False

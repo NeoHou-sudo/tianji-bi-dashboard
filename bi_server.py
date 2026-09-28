@@ -395,6 +395,7 @@ def upload_to_drive(local_path):
 sys.path.insert(0, BASE)
 import gen_fix  # 生成引擎
 import cred_store  # 凭证留档系统
+import local_accounts  # 本地账号系统（超管/主管）
 
 
 def load_customer(name):
@@ -655,6 +656,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._json({"ok": r.get("code") == 0, "msg": r.get("msg", "")}); return
             if path == "/api/login":
                 uname = (req.get("username") or "").strip()
+                pwd = req.get("password") or ""
                 _ip = self.client_address[0] if self.client_address else "?"
                 rlkey = uname + "|" + _ip
                 if ALLOWED_ACCOUNTS and uname not in ALLOWED_ACCOUNTS:
@@ -662,7 +664,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self._json({"ok": False, "error": "该账号未开通本看板访问权限"}); return
                 if login_blocked(rlkey):
                     self._json({"ok": False, "error": "尝试次数过多，请 15 分钟后再试"}); return
-                ok, msg, info = ts_login(uname, req.get("password") or "", (req.get("smsCode") or "").strip())
+                # 先尝试本地账号（超管/主管，不经过天枢）
+                local_info = local_accounts.verify_local(uname, pwd)
+                if local_info:
+                    login_ok(rlkey)
+                    audit("LOGIN-OK-LOCAL", uname, _ip, "role=" + str(local_info.get("role")))
+                    sid = sess_create(local_info)
+                    body = json.dumps({"ok": True, "nickname": local_info["nickname"], "local": True}).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Set-Cookie", sess_cookie(sid))
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers(); self.wfile.write(body); return
+                # 本地账号验证失败，走天枢认证
+                ok, msg, info = ts_login(uname, pwd, (req.get("smsCode") or "").strip())
                 if not ok:
                     login_fail(rlkey)
                     audit("LOGIN-FAIL", uname, _ip, str(msg)[:60])

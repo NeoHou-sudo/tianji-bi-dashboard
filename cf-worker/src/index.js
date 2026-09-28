@@ -242,6 +242,22 @@ async function login(request, env) {
     return json({ ok: false, error: '尝试次数过多，请 15 分钟后再试' });
   }
 
+  // ===== 本地超管账号（不经过天枢认证）=====
+  // 格式：BI_LOCAL_ADMINS="neo:hou59215921,username2:password2"
+  const localAdmins = String(env.BI_LOCAL_ADMINS || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  for (const entry of localAdmins) {
+    const idx = entry.indexOf(':');
+    if (idx < 0) continue;
+    const lu = entry.slice(0, idx).trim();
+    const lp = entry.slice(idx + 1).trim();
+    if (lu === username && lp === password) {
+      await clearFail(env, rlKey);
+      const cookie = await makeCookie(env, { u: lu, n: lu, d: lu, m: '', y: '' }, SESSION_TTL);
+      return json({ ok: true, nickname: lu, local: true }, 200, { 'Set-Cookie': cookie });
+    }
+  }
+
   const r = await tsPost(env, '/api/admin-api/system/auth/login', { username, password, smsCode });
   if (r.code !== 0 || !r.data) {
     await bumpFail(env, rlKey);
