@@ -88,19 +88,27 @@ MAIN_PATCHES = [
     ('<script src="assets/data.js"></script>', DATA_LOADER),
     # 3) 拦截本机专属接口
     ('// ===== 登录逻辑 =====', FETCH_SHIM + '// ===== 登录逻辑 ====='),
-    # 4) 隐藏表头「全选」列与「一键修正」列
+    # 4) 隐藏表头「全选」checkbox 列（批量打包依赖本机，云端不启用）
     ("<th style=\"width:34px;cursor:default\"><input type=\"checkbox\" id=\"ckAll\" title=\"全选当前筛选\" style=\"cursor:pointer\"></th>",
      "<th class=\"cf-hide\" style=\"width:34px;cursor:default\"></th>"),
-    ('+ \'<th style="width:92px;cursor:default">一键修正</th>\'',
-     '+ \'<th class="cf-hide" style="width:92px;cursor:default"></th>\''),
-    # 5) 行内：去掉勾选框单元格与「修正」按钮
-    ('return `<tr><td><input type="checkbox" class="rowck" data-name="${c.name.replace(/"/g,\'\')}" style="cursor:pointer"></td>${cells}<td><button class="mini" data-fix="${c.id}">修正</button></td></tr>`;',
-     'return `<tr><td class="cf-hide"></td>${cells}<td class="cf-hide"></td></tr>`;'),
-    # 6) 空态 colspan 跟着减 2
-    ('<tr><td colspan="${COLS.length}" class="empty">没有符合条件的客户</td></tr>',
-     '<tr><td colspan="${COLS.length + 2}" class="empty">没有符合条件的客户</td></tr>'),
+    # 5) 行内：隐藏 checkbox 单元格（一键修正列由 isFullAccess() 运行时控制，不在此处隐藏）
+    ('return `<tr><td><input type="checkbox" class="rowck" data-name="${c.name.replace(/"/g,\'\')}" style="cursor:pointer"></td>${cells}${isFullAccess() ? \'<td><button class="mini" data-fix="\'+c.id+\'">修正</button></td>\' : \'\'}</tr>`;',
+     'return `<tr><td class="cf-hide"></td>${cells}${isFullAccess() ? \'<td><button class="mini" data-fix="\'+c.id+\'" onclick="void(0)">修正</button></td>\' : \'\'}</tr>`;'),
+    # 6) 空态 colspan：checkbox 已隐藏（cf-hide），只需覆盖数据列 + 可能的修正列
+    ('<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>',
+     '<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>'),
     # 7) 去掉「打开内部口径文档（需登录）」链接
     ('<p><a href="/doc" target="_blank" class="doc-link">📄 打开内部口径文档（需登录）</a></p>', ''),
+    # 8) Cloudflare 版：一键修正按钮改为直接下载文本方案（不调 /api/fix_only）
+    (
+        'function renderLegend(){',
+        '// CF override: fix button → downloadFix (no backend call)\n'
+        'document.querySelectorAll(\'[data-fix]\').forEach(btn=>{\n'
+        '  const nc = D.customers.find(x=>String(x.id)===btn.dataset.fix);\n'
+        '  if(nc) btn.onclick = (e)=>{ e.stopPropagation(); downloadFix(nc); };\n'
+        '});\n'
+        'function renderLegend(){',
+    ),
 ]
 
 DRILL_PATCHES = [

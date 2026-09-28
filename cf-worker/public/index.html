@@ -975,7 +975,7 @@ function renderTable(rows){
     const arr = state.sortKey===c.k ? `<span class="arr">${state.sortDesc?'▼':'▲'}</span>` : '';
     const w = colW(c.k) ? ` style="width:${colW(c.k)}px"` : '';
     return `<th data-k="${c.k}" class="${c.n?'right':''}"${w}>${c.t}${arr}<span class="grip"></span></th>`;
-  }).join('') + '<th class="cf-hide" style="width:92px;cursor:default"></th>';
+  }).join('') + (isFullAccess() ? '<th style="width:92px;cursor:default">一键修正</th>' : '');
   const sorted = [...rows].sort((a,b)=>{
     let x=a[state.sortKey], y=b[state.sortKey];
     if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
@@ -1028,8 +1028,8 @@ function renderTable(rows){
       })()}</td>`,
     };
     const cells = COLS.map(col=> CELL[col.k] ? CELL[col.k]() : '').join('');
-    return `<tr><td class="cf-hide"></td>${cells}<td class="cf-hide"></td></tr>`;
-  }).join('') : `<tr><td colspan="${COLS.length + 2}" class="empty">没有符合条件的客户</td></tr>`;
+    return `<tr><td class="cf-hide"></td>${cells}${isFullAccess() ? '<td><button class="mini" data-fix="'+c.id+'" onclick="void(0)">修正</button></td>' : ''}</tr>`;
+  }).join('') : `<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>`;
   const _tc = document.getElementById('tblCount');
   _tc.innerHTML = '（' + odoSpan('tblN', sorted.length) + ' 条）';
   hydrateOdo(_tc);
@@ -1146,6 +1146,11 @@ function renderTable(rows){
   });
 }
 
+// CF override: fix button → downloadFix (no backend call)
+document.querySelectorAll('[data-fix]').forEach(btn=>{
+  const nc = D.customers.find(x=>String(x.id)===btn.dataset.fix);
+  if(nc) btn.onclick = (e)=>{ e.stopPropagation(); downloadFix(nc); };
+});
 function renderLegend(){
   document.getElementById('legendRow').innerHTML =
     JUDGE_ORDER.filter(j=>D.customers.some(c=>c.judge===j))
@@ -1167,26 +1172,41 @@ document.getElementById('fSearch').oninput = e=>{ state.q=e.target.value.trim();
 
 function exportCSV(){
   const rows = filtered();
-  const extra = [{k:'diagTags',t:'问题标签'},{k:'advice',t:'建议动作'}];
-  const all = [...COLS, ...extra];
-  const esc = v => {
-    let s = (v==null) ? '' : (Array.isArray(v) ? v.join('；') : String(v));
-    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
-  };
-  const lines = [all.map(c=>esc(c.t)).join(',')];
-  rows.forEach(r=>{
-    lines.push(all.map(c=>{
-      let v = r[c.k];
-      if(c.k==='alive') v = v?'活跃':'已到期';
-      return esc(v);
-    }).join(','));
-  });
-  const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `客户明细_${D.generatedAt}_${rows.length}条.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  try{ showToast('✅ 已导出当前筛选的 ' + rows.length + ' 家客户明细（CSV）'); }catch(e){}
+  const full = isFullAccess();
+  if(full){
+    // 完整导出：全部列 + 问题标签/建议
+    const extra = [{k:'diagTags',t:'问题标签'},{k:'advice',t:'建议动作'}];
+    const all = [...COLS, ...extra];
+    const esc = v => {
+      let s = (v==null) ? '' : (Array.isArray(v) ? v.join('；') : String(v));
+      return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    };
+    const lines = [all.map(c=>esc(c.t)).join(',')];
+    rows.forEach(r=>{
+      lines.push(all.map(c=>{
+        let v = r[c.k];
+        if(c.k==='alive') v = v?'活跃':'已到期';
+        return esc(v);
+      }).join(','));
+    });
+    const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `客户明细_${D.generatedAt}_${rows.length}条.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    try{ showToast('✅ 已导出当前筛选的 ' + rows.length + ' 家客户明细（CSV）'); }catch(e){}
+  } else {
+    // 仅导出客户名单（仅客户名称一列）
+    const esc = v => { const s = (v==null) ? '' : String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+    const lines = ['客户名称'];
+    rows.forEach(r=>{ lines.push(esc(r.name)); });
+    const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `客户名单_${D.generatedAt}_${rows.length}条.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    try{ showToast('✅ 已导出 ' + rows.length + ' 家客户名单（仅名称，详细数据请联系管理员）'); }catch(e){}
+  }
 }
 document.getElementById('btnExport').onclick = exportCSV;
 const _btnExportTbl = document.getElementById('btnExportTbl');
@@ -1412,11 +1432,18 @@ document.addEventListener('click', (e)=>{
 
 // ===== 登录逻辑 =====
 let LOGIN_USER = null;
+let LOGIN_ACCOUNT = null;
+// 拥有完整数据权限的账号（可导出完整 CSV + 一键修正）
+const FULL_ACCESS_ACCOUNTS = ['ziyu', 'lily'];
+function isFullAccess(){
+  const acc = String((D.scope && D.scope.loginUser) || LOGIN_ACCOUNT || '').trim();
+  return FULL_ACCESS_ACCOUNTS.indexOf(acc) >= 0;
+}
 async function checkLogin(){
   try{
     const r = await fetch('/api/me', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
     const d = await r.json();
-    if(d.ok){ LOGIN_USER = d.nickname; document.getElementById('loginMask').style.display='none'; if(window.DASHBOARD_DATA && window.DASHBOARD_DATA.locked){ location.reload(); return true; } applyLoginFilter(); return true; }
+    if(d.ok){ LOGIN_USER = d.nickname; LOGIN_ACCOUNT = d.account; document.getElementById('loginMask').style.display='none'; if(window.DASHBOARD_DATA && window.DASHBOARD_DATA.locked){ location.reload(); return true; } applyLoginFilter(); return true; }
   }catch(e){}
   document.getElementById('loginMask').style.display='flex';
   return false;
@@ -1494,7 +1521,7 @@ document.getElementById('lgBtn').onclick = async ()=>{
   document.getElementById('lgMsg').textContent='登录中…';
   const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,smsCode:c})});
   const d = await r.json();
-  if(d.ok){ LOGIN_USER = d.nickname; document.getElementById('loginMask').style.display='none'; if(window.DASHBOARD_DATA && window.DASHBOARD_DATA.locked){ location.reload(); return; } applyLoginFilter(); }
+  if(d.ok){ LOGIN_USER = d.nickname; LOGIN_ACCOUNT = d.account; document.getElementById('loginMask').style.display='none'; if(window.DASHBOARD_DATA && window.DASHBOARD_DATA.locked){ location.reload(); return; } applyLoginFilter(); }
   else { document.getElementById('lgMsg').textContent = '登录失败：'+(d.error||''); }
 };
 

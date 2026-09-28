@@ -36,6 +36,9 @@
   .warnbar{display:none;margin-bottom:14px;padding:11px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;line-height:1.6}
   .warnbar.show{display:block}
   #wm{position:fixed;inset:0;z-index:9000;pointer-events:none;overflow:hidden;display:none}
+  .balbar{display:inline-block;width:90px;height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden;vertical-align:middle;margin-right:6px}
+  .balbar i{display:block;height:100%;border-radius:4px;transition:width .3s}
+  .baltxt{font-size:11px;color:#64748b;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -86,7 +89,8 @@ const COLS = [
   {k:'judge',        t:'续费判断',  w:'left'},
   {k:'diff',         t:'续费难度',  w:'left'},
   {k:'effectLevel',  t:'效果评级',  w:'left'},
-  {k:'diag',         t:'问题诊断',  w:'left'}
+  {k:'diag',         t:'问题诊断',  w:'left'},
+  {k:'balanceBar',   t:'余额进度',  w:'left'}
 ];
 const HIDE = ['未分配','李嘉洲','漠鹰'];
 let DATA = [], sortKey = 'prec', sortDesc = true;
@@ -115,6 +119,16 @@ function cell(c, col){
     const m = {'优先谈续费':'#10b981','提前铺续费':'#06b6d4','健康维护':'#3b82f6','常规维护':'#94a3b8','效果存疑需干预':'#f59e0b','风险流失预警':'#ef4444','已到期待挽回':'#7c3aed','数据缺失':'#cbd5e1'};
     const cc = m[v] || '#94a3b8';
     return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
+  }
+  if(col.k==='balanceBar'){
+    const bal = Number(c.cnyLeft)||0, mo = Number(c.monthlyAvg)||0;
+    if(!bal && !mo) return '<td class="left">—</td>';
+    const months = mo>0 ? bal/mo : (bal>0?Infinity:0);
+    const pct = mo>0 ? Math.min(100, months/6*100) : (bal>0?100:0);
+    const col2 = months>=3?'#10b981':(months>=1?'#f59e0b':'#ef4444');
+    const moTxt = months===Infinity?'∞':(months.toFixed(1)+'月');
+    const balTxt = '¥'+Math.round(bal).toLocaleString('zh-CN');
+    return `<td class="left"><span class="balbar"><i style="width:${pct}%;background:${col2}"></i></span><span class="baltxt">${balTxt} / ${moTxt}</span></td>`;
   }
   return `<td class="${col.w==='right'?'right':''}${col.k==='name'?' name':''}">${v}</td>`;
 }
@@ -154,8 +168,24 @@ function render(){
 function exportCSV(){
   const r = rows();
   const esc = v => { const s = (v==null) ? '' : String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const full = String(window.__BI_ACCOUNT || '').trim();
+  if(full !== 'ziyu' && full !== 'lily'){
+    // 仅导出客户名单
+    const lines = ['客户名称'];
+    r.forEach(c=>lines.push(esc(c.name)));
+    const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `客户名单_效果下钻_${r.length}条_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    const cn = document.getElementById('cnt');
+    if(cn){ const t = cn.textContent; cn.textContent = '已导出 ' + r.length + ' 家名单 ✓'; setTimeout(()=>{ cn.textContent = t; }, 2500); }
+    return;
+  }
+  // 完整导出
   const val = (c,col)=>{
     if(col.k==='prec')  return c.prec==null ? '' : c.prec + '%';
+    if(col.k==='balanceBar') return (c.cnyLeft==null?'':'¥'+Math.round(c.cnyLeft).toLocaleString('zh-CN')) + '/' + (c.monthlyAvg>0?(c.cnyLeft/c.monthlyAvg).toFixed(1)+'月':'—');
     if(col.pct===100)   return c[col.k]==null ? '' : (c[col.k]*100).toFixed(1) + '%';
     if(col.pct==='raw') return c[col.k]==null ? '' : c[col.k] + '%';
     return c[col.k]==null ? '' : c[col.k];
@@ -206,6 +236,7 @@ async function boot(){
   try{
     const me = await (await fetch('/api/me', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).json();
     if(me && me.ok){
+      window.__BI_ACCOUNT = me.account || '';
       const txt = (me.account||me.nickname||'user') + ' · ' + (me.loginAt||'');
       const c = document.createElement('canvas'), W=520,H=300;
       c.width=W; c.height=H;
