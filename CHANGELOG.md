@@ -2,6 +2,15 @@
 
 > 每版对应一个 Git tag（vX.Y.Z），随 `./release.sh` 一起维护。
 
+## v1.4.2（2026-09-28）
+
+- **移动端图表修复**：`initChart` 增加容器宽度校验，宽度为 0 时延迟初始化（setInterval 轮询重试）
+- 初始化后自动调用 `resize()` 重新计算图表尺寸
+- `renderCharts` 末尾统一 resize 所有图表
+- 新增 `window.load` 事件监听，页面完全加载后 300ms 重新 resize
+- 窗口 resize 处理器增加 200ms 防抖
+- `renderCharts` 增加 ECharts 未加载时的 300ms 重试机制
+
 ## v1.4.1（2026-09-28）
 
 - **移动端适配**：新增 `@media(max-width:768px)` 和 `@media(max-width:480px)` 两套断点

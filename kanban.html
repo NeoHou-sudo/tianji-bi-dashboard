@@ -856,7 +856,25 @@ function renderKPI(rows){
 
 // 图表
 let charts = {};
-function initChart(id){ if(!charts[id]){ const el=document.getElementById(id); if(el && window.echarts) charts[id]=echarts.init(el); } return charts[id]; }
+function initChart(id){
+  if(charts[id]) return charts[id];
+  const el = document.getElementById(id);
+  if(!el || !window.echarts) return null;
+  // 确保容器有实际宽度后再初始化（移动端 viewport 下容器可能尚未完成布局）
+  if(el.offsetWidth === 0 || el.offsetHeight === 0){
+    const check = setInterval(()=>{
+      const el2 = document.getElementById(id);
+      if(el2 && el2.offsetWidth > 0 && el2.offsetHeight > 0){
+        clearInterval(check);
+        if(!charts[id]){ charts[id] = echarts.init(el2); charts[id]?.resize(); }
+      }
+    }, 80);
+    return null;
+  }
+  charts[id] = echarts.init(el);
+  charts[id]?.resize();
+  return charts[id];
+}
 
 function bindChartClick(chart, fn){
   if(!chart || chart.__clickBound) return;
@@ -879,7 +897,7 @@ function toggleDD(elId, value){
 }
 
 function renderCharts(rows){
-  if(!window.echarts) return;
+  if(!window.echarts){ setTimeout(()=>renderCharts(rows), 300); return; }
   // 续费判断环形（排除自身维度，可连续点选）
   const jrows = filtered();
   const jc = {}; jrows.forEach(c=>jc[c.judge]=(jc[c.judge]||0)+1);
@@ -955,6 +973,8 @@ function renderCharts(rows){
     series:[{type:'bar',data:msum.map(x=>({value:x.v,itemStyle:{color:C.green}})),
       label:{show:true,position:'right',formatter:p=>fmtMoney(p.value),fontSize:10,color:'#64748b'}}]
   },true);
+  // 确保所有图表在容器尺寸变化后重新计算
+  Object.values(charts).forEach(c=>c&&c.resize());
 }
 
 // 经理卡片
@@ -1371,7 +1391,9 @@ document.getElementById('btnReset').onclick = ()=>{
   const cbar = document.getElementById('coverBar'); if(cbar) cbar.style.display = 'none';
   render();
 };
-window.addEventListener('resize', ()=>Object.values(charts).forEach(c=>c&&c.resize()));
+window.addEventListener('resize', ()=>{ clearTimeout(window._chartRz); window._chartRz=setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()), 200); });
+// 页面完全加载后重新计算所有图表尺寸（解决移动端容器布局延迟问题）
+window.addEventListener('load', ()=>{ setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()), 300); });
 
 // 行业/品类速查（从主营产品聚合）
 function primaryCat(c){
