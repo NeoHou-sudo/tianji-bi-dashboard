@@ -39,6 +39,44 @@
   .balbar{display:inline-block;width:90px;height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden;vertical-align:middle;margin-right:6px}
   .balbar i{display:block;height:100%;border-radius:4px;transition:width .3s}
   .baltxt{font-size:11px;color:#64748b;font-variant-numeric:tabular-nums}
+
+  /* ===== 移动端适配 ===== */
+  @media(max-width:768px){
+    .wrap{padding:14px 12px 40px}
+    h1{font-size:17px}
+    .sub{font-size:11px}
+    /* 筛选栏 */
+    .bar{padding:10px 12px;border-radius:8px;gap:6px}
+    .bar label{font-size:11px}
+    select,input{font-size:12px;padding:6px 8px;border-radius:6px}
+    .btn{font-size:12px;padding:6px 12px}
+    .cnt{font-size:11px}
+    /* 表格横滚 */
+    .scroll{max-height:540px;-webkit-overflow-scrolling:touch}
+    table{font-size:11px}
+    thead th{font-size:10px;padding:7px 8px}
+    tbody td{padding:7px 8px;font-size:11px}
+    .name{max-width:180px;font-size:12px}
+    .pill{font-size:10px;padding:1px 5px}
+    .balbar{width:70px}
+    .baltxt{font-size:10px}
+  }
+
+  @media(max-width:480px){
+    .wrap{padding:12px 8px 36px}
+    h1{font-size:15px}
+    .bar{padding:8px 10px;gap:4px}
+    select,input{font-size:11px;padding:5px 7px}
+    .btn{font-size:11px;padding:5px 10px}
+    .scroll{max-height:480px}
+    table{font-size:10px}
+    thead th{font-size:9px;padding:6px}
+    tbody td{padding:6px;font-size:10px}
+    .name{max-width:140px;font-size:11px}
+    .pill{font-size:9px}
+    .balbar{width:56px}
+    .baltxt{font-size:9px}
+  }
 </style>
 </head>
 <body>

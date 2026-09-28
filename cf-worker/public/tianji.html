@@ -146,6 +146,89 @@ td{overflow:hidden}
 .legend-row i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.grid3,.grid-2-1{grid-template-columns:1fr}}
 
+/* ===== 移动端适配 ===== */
+@media(max-width:768px){
+  body{padding:0 0 40px;font-size:13px}
+  .wrap{padding:0 12px}
+  .header{margin:0 -12px 16px;padding:14px 16px}
+  .header h1{font-size:17px}
+  .header .sub{font-size:11px}
+  /* KPI：2列 */
+  .kpis{grid-template-columns:repeat(2,1fr);gap:8px}
+  .kpi{padding:12px 14px;border-radius:8px}
+  .kpi .k-value{font-size:20px}
+  .kpi .k-label{font-size:11px}
+  .kpi .k-sub{font-size:10px}
+  /* 图表面板：单列 */
+  .grid3,.grid-2-1{grid-template-columns:1fr;gap:12px}
+  .panel{padding:12px 14px}
+  .chart{height:200px}
+  .chart.tall{height:220px}
+  /* 筛选器 */
+  .filters{padding:10px 12px;border-radius:8px;gap:6px}
+  .filters select,.filters input{font-size:12px;padding:6px 8px;min-width:90px;border-radius:6px}
+  .filters label{font-size:11px}
+  .btn{font-size:12px;padding:6px 12px;border-radius:6px}
+  .dd-btn{font-size:12px;min-width:90px;padding:6px 10px}
+  .dd-menu{min-width:160px}
+  .chip{font-size:11px;padding:4px 10px}
+  /* 经理卡片 */
+  .mgrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .mcard{padding:12px 14px;border-radius:8px}
+  .mcard .m-name{font-size:13px}
+  .mcard .m-money{font-size:16px}
+  /* 表格：横向滚动 + 缩小 */
+  .table-panel{border-radius:8px}
+  .table-head{padding:10px 12px}
+  .tbl-scroll{max-height:540px;-webkit-overflow-scrolling:touch}
+  table{font-size:11px}
+  thead th{font-size:10px;padding:7px 8px}
+  tbody td{padding:7px 8px;font-size:11px}
+  td.cust{font-size:12px}
+  .tag{font-size:10px;padding:2px 6px}
+  .mini{font-size:10px;padding:2px 8px}
+  /* 登录面板 */
+  #loginMask > div{width:92vw;max-width:340px;padding:24px 20px;border-radius:12px}
+  /* 抽屉面板 */
+  #arcPanel{width:94vw}
+  #infoPanel{width:94vw}
+  /* 提示/工具按钮 */
+  #btnInfo{width:38px;height:38px;font-size:15px;bottom:16px;left:16px}
+  .toast{bottom:16px;right:16px;padding:10px 16px;font-size:12px}
+  .legend-row{padding:8px 12px 12px;font-size:11px}
+  .footer{font-size:11px}
+}
+
+@media(max-width:480px){
+  body{font-size:12px}
+  .wrap{padding:0 8px}
+  .header{margin:0 -8px 14px;padding:12px 14px}
+  .header h1{font-size:15px}
+  /* KPI：2列但更紧凑 */
+  .kpis{gap:6px}
+  .kpi{padding:10px 12px}
+  .kpi .k-value{font-size:17px}
+  /* 筛选器：全宽换行 */
+  .filters select,.filters input{min-width:0;flex:1 1 calc(50% - 6px);font-size:12px}
+  .dd-btn{min-width:0;flex:1 1 calc(50% - 6px)}
+  .btn{flex:1 1 calc(50% - 6px);text-align:center}
+  /* 经理卡片：2列最小 */
+  .mgrid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  /* 表格 */
+  .tbl-scroll{max-height:480px}
+  table{font-size:10px}
+  thead th{font-size:9px;padding:6px}
+  tbody td{padding:6px;font-size:10px}
+  td.cust{font-size:11px}
+  .tag{font-size:9px;padding:1px 5px}
+  .mini{font-size:9px;padding:2px 6px}
+  /* 折叠面板头部可触摸 */
+  .foldhead{padding:8px 0}
+  /* 登录面板 */
+  #loginMask > div{width:94vw;padding:20px 16px}
+  #lgBtn{font-size:14px;padding:10px}
+}
+
 /* ===== 美化增强 ===== */
 body{background:linear-gradient(180deg,#eef2f7 0%,#f7f9fc 100%);-webkit-font-smoothing:antialiased}
 .panel:hover,.mcard:hover{box-shadow:0 4px 12px rgba(15,23,42,.07),0 18px 40px rgba(15,23,42,.07)}
