@@ -1,0 +1,33 @@
+# =====================================================================
+# 天玑 · 每日数据抓取流水线  systemd service（一次性任务）
+# 安装：
+#   sudo cp deploy/tianji-update.service /etc/systemd/system/
+#   sudo cp deploy/tianji-update.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tianji-update.timer
+# 手动跑一次：
+#   sudo systemctl start tianji-update.service
+#   journalctl -u tianji-update -n 100 --no-pager
+# =====================================================================
+[Unit]
+Description=Tianji BI daily data refresh (听言 + 天枢 → data.js)
+After=network-online.target tianji-bi.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tianji
+Group=tianji
+WorkingDirectory=/opt/tianji-bi
+EnvironmentFile=/opt/tianji-bi/.env
+ExecStart=/usr/bin/python3 /opt/tianji-bi/daily_update.py
+
+# 抓取 + 逐客户诊断可能较久，给足时间
+TimeoutStartSec=3600
+
+# ---- 进程加固 ----
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/tianji-bi /home/tianji/.baixyn-api

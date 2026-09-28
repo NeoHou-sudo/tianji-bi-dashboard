@@ -1,0 +1,27 @@
+# 构建镜像时排除的东西（减小镜像体积、避免把密钥打进镜像）
+
+# 密钥与本地配置，绝不能进镜像
+.env
+*.env.local
+
+# 运行期产生的数据（镜像里不需要，也不该带走）
+sessions.db
+日志/
+生成结果/
+批量打包/
+snapshots/
+*.bak
+服务运行.log
+归档记录.json
+
+# 缓存与杂项
+__pycache__/
+*.pyc
+.DS_Store
+.git/
+.gitignore
+
+# 本地开发文档（可留可去）
+deploy/DEPLOY.md
+deploy/DATA-PIPELINE.md
+deploy/国内部署-手把手.md

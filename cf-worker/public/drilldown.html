@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天玑 · 效果指标下钻</title>
+<style>
+  :root{--border:#e6ebf2;--muted:#64748b;--blue:#2563eb;--green:#10b981;--orange:#f59e0b;--red:#ef4444}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f7fb;color:#0f172a}
+  .wrap{max-width:1500px;margin:0 auto;padding:22px 20px 60px}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(15,23,42,.04)}
+  .bar label{font-size:12px;color:var(--muted)}
+  select,input{border:1px solid #cbd5e1;border-radius:8px;padding:5px 9px;font-size:13px;color:#334155;background:#fff}
+  .btn{font-family:inherit;font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;font-weight:600;transition:.15s}
+  .btn:hover{background:#f1f5f9;border-color:#94a3b8}
+  .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+  .btn.primary:hover{background:#1d4ed8}
+  .bar .sp{flex:1}
+  .cnt{font-size:12px;color:var(--muted)}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(15,23,42,.05);overflow:hidden}
+  .scroll{max-height:72vh;overflow:auto}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+  thead th{position:sticky;top:0;z-index:5;background:#f8fafc;border-bottom:1px solid var(--border);padding:10px 11px;text-align:left;font-weight:600;color:#475569;font-size:12px;white-space:nowrap;cursor:pointer;user-select:none}
+  thead th:hover{background:#eef2f7}
+  thead th.right{text-align:right}
+  thead th .ar{color:var(--blue);font-size:10px;margin-left:2px}
+  tbody td{padding:9px 11px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+  tbody td.right{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:#f8fbff}
+  .name{font-weight:500;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+  .pill{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:600}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
+  .warnbar{display:none;margin-bottom:14px;padding:11px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;line-height:1.6}
+  .warnbar.show{display:block}
+  #wm{position:fixed;inset:0;z-index:9000;pointer-events:none;overflow:hidden;display:none}
+</style>
+</head>
+<body>
+<div id="wm"></div>
+<div class="wrap">
+  <h1>📊 效果指标下钻</h1>
+  <div class="sub">天玑 · 售后看板 · 独立下钻页（数据与主页同源，仅展示效果类指标）</div>
+
+  <div class="warnbar" id="warn"></div>
+
+  <div class="bar">
+    <label>客户成功经理</label>
+    <select id="fMgr"><option value="">全部</option></select>
+    <label>版本</label>
+    <select id="fVer"><option value="">全部</option></select>
+    <label>效果评级</label>
+    <select id="fEff"><option value="">全部</option></select>
+    <input id="fQ" placeholder="搜索客户名…" style="min-width:170px">
+    <button class="btn primary" id="btnExport">⬇ 导出CSV（当前筛选）</button>
+    <span class="sp"></span>
+    <span class="cnt" id="cnt">加载中…</span>
+  </div>
+
+  <div class="card">
+    <div class="scroll">
+      <table>
+        <thead><tr id="th"></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script>
+// ===== 云端版：这些接口依赖本机服务，这里直接给占位结果，避免报错 =====
+(function(){
+  var LOCAL_ONLY = ['/api/status','/api/refresh','/api/history','/api/batch',
+                    '/api/fix','/api/fix_only','/api/download','/api/file'];
+  var _f = window.fetch.bind(window);
+  window.fetch = function(u, o){
+    try{
+      var s = (typeof u === 'string') ? u : ((u && u.url) || '');
+      var path = s.split('?')[0];
+      for(var i=0;i<LOCAL_ONLY.length;i++){
+        if(path.indexOf(LOCAL_ONLY[i]) >= 0){
+          var body = {ok:false, error:'云端只读版未启用该功能，请在本机看板操作', readonly:true};
+          if(path.slice(-19) === '/api/refresh/status') body = {ok:true, running:false, finished:false, progress:null, changed:false};
+          if(path.slice(-12) === '/api/history')        body = {ok:true, records:[]};
+          return Promise.resolve(new Response(JSON.stringify(body),
+            {status:200, headers:{'Content-Type':'application/json'}}));
+        }
+      }
+    }catch(e){}
+    return _f.apply(window, arguments);
+  };
+})();
+
+// ============ 独立下钻页：不依赖主页任何脚本，自己取数、自己渲染 ============
+const COLS = [
+  {k:'name',         t:'客户名称',  w:'left'},
+  {k:'mgr',          t:'客户成功经理', w:'left'},
+  {k:'ver',          t:'版本',      w:'left'},
+  {k:'prec',         t:'精准率',    w:'right', pct:1},
+  {k:'prec100',      t:'近期精准度', w:'right', pct:'raw'},
+  {k:'lastAnnot',    t:'最近标注时间', w:'left'},
+  {k:'unlockRatio',  t:'解锁率',    w:'right', pct:100},
+  {k:'openRatio',    t:'邮件打开率', w:'right', pct:100},
+  {k:'emailInqRate', t:'邮件询盘率', w:'right', pct:'raw'},
+  {k:'nonWaInq',     t:'非WA询盘',  w:'right'},
+  {k:'inqRatio',     t:'询盘占比',  w:'right', pct:'raw'},
+  {k:'judge',        t:'续费判断',  w:'left'},
+  {k:'diff',         t:'续费难度',  w:'left'},
+  {k:'effectLevel',  t:'效果评级',  w:'left'},
+  {k:'diag',         t:'问题诊断',  w:'left'}
+];
+const HIDE = ['未分配','李嘉洲','漠鹰'];
+let DATA = [], sortKey = 'prec', sortDesc = true;
+const $ = id => document.getElementById(id);
+
+function rank(v){ if(v==null||v==='') return null; const s=String(v); return s.indexOf('C')>=0?2:(s.indexOf('D')>=0?3:(s.indexOf('B')>=0?1:0)); }
+
+function cell(c, col){
+  let v = c[col.k];
+  if(col.pct === 1)      v = (c.prec==null ? '—' : c.prec + '%');
+  else if(col.pct === 100) v = (c[col.k]==null ? '—' : (c[col.k]*100).toFixed(1) + '%');
+  else if(col.pct === 'raw') v = (c[col.k]==null ? '—' : c[col.k] + '%');
+  else v = (v==null || v==='') ? '—' : v;
+  if(col.k==='prec' || col.k==='unlockRatio' || col.k==='openRatio' || col.k==='emailInqRate'){
+    const n = Number(c[col.k - ''] !== undefined ? (col.pct===100 ? c[col.k]*100 : c[col.k]) : 0);
+    const p = col.k==='prec' ? Number(c.prec) : (col.pct===100 ? Number(c[col.k])*100 : Number(c[col.k]));
+    const col2 = (p==null || isNaN(p)) ? '#94a3b8' : (p>=50?'#10b981':(p>=25?'#f59e0b':'#ef4444'));
+    return `<td class="right" style="color:${col2};font-weight:600">${v}</td>`;
+  }
+  if(col.k==='effectLevel' && v!=='—'){
+    const m = {'A':'#10b981','B':'#3b82f6','C':'#f59e0b','D':'#ef4444'};
+    const cc = m[String(v).charAt(0)] || '#94a3b8';
+    return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
+  }
+  if(col.k==='judge' && v!=='—'){
+    const m = {'优先谈续费':'#10b981','提前铺续费':'#06b6d4','健康维护':'#3b82f6','常规维护':'#94a3b8','效果存疑需干预':'#f59e0b','风险流失预警':'#ef4444','已到期待挽回':'#7c3aed','数据缺失':'#cbd5e1'};
+    const cc = m[v] || '#94a3b8';
+    return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
+  }
+  return `<td class="${col.w==='right'?'right':''}${col.k==='name'?' name':''}">${v}</td>`;
+}
+
+function rows(){
+  const m = $('fMgr').value, v = $('fVer').value, e = $('fEff').value, q = ($('fQ').value||'').toLowerCase();
+  let r = DATA.filter(c => !HIDE.some(h => (c.mgr||'').indexOf(h) >= 0));
+  if(m) r = r.filter(c => c.mgr === m);
+  if(v) r = r.filter(c => (c.ver||'') === v);
+  if(e) r = r.filter(c => (c.effectLevel||'') === e);
+  if(q) r = r.filter(c => (c.name||'').toLowerCase().includes(q) || (c.catCn||'').toLowerCase().includes(q));
+  r.sort((a,b)=>{
+    let x=a[sortKey], y=b[sortKey];
+    if(sortKey==='effectLevel'){ x=rank(x); y=rank(y); }
+    else if(typeof x==='number' || typeof y==='number'){ x=Number(x)||0; y=Number(y)||0; }
+    else { x=String(x==null?'':x); y=String(y==null?'':y); }
+    if(x<y) return sortDesc?1:-1;
+    if(x>y) return sortDesc?-1:1;
+    return 0;
+  });
+  return r;
+}
+
+function render(){
+  const r = rows();
+  $('cnt').textContent = `共 ${r.length} 家`;
+  $('th').innerHTML = COLS.map(c => `<th data-k="${c.k}" class="${c.w==='right'?'right':''}">${c.t}${sortKey===c.k?(sortDesc?' ▼':' ▲'):''}</th>`).join('');
+  $('tb').innerHTML = r.length ? r.map(c => `<tr>${COLS.map(col => cell(c,col)).join('')}</tr>`).join('')
+                               : `<tr><td class="empty" colspan="${COLS.length}">没有符合条件的客户</td></tr>`;
+  document.querySelectorAll('#th th').forEach(th=>{
+    th.onclick = ()=>{ const k = th.dataset.k;
+      if(sortKey===k) sortDesc = !sortDesc; else { sortKey = k; sortDesc = true; }
+      render(); };
+  });
+}
+
+function exportCSV(){
+  const r = rows();
+  const esc = v => { const s = (v==null) ? '' : String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const val = (c,col)=>{
+    if(col.k==='prec')  return c.prec==null ? '' : c.prec + '%';
+    if(col.pct===100)   return c[col.k]==null ? '' : (c[col.k]*100).toFixed(1) + '%';
+    if(col.pct==='raw') return c[col.k]==null ? '' : c[col.k] + '%';
+    return c[col.k]==null ? '' : c[col.k];
+  };
+  const lines = [COLS.map(c=>esc(c.t)).join(',')];
+  r.forEach(c=>lines.push(COLS.map(col=>esc(val(c,col))).join(',')));
+  const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `客户明细_效果下钻_${r.length}条_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  const cn = document.getElementById('cnt');
+  if(cn){ const t = cn.textContent; cn.textContent = '已导出 ' + r.length + ' 家 ✓'; setTimeout(()=>{ cn.textContent = t; }, 2500); }
+}
+document.getElementById('btnExport').onclick = exportCSV;
+
+async function boot(){
+  try{
+    let D;
+    if(window.BI_CONFIG && window.BI_CONFIG.dataUrl){
+      await new Promise((res, rej)=>{ const s = document.createElement('script');
+        s.src = window.BI_CONFIG.dataUrl; s.onload = res; s.onerror = ()=>rej(new Error('云端数据加载失败'));
+        document.head.appendChild(s); });
+      D = window.DASHBOARD_DATA;
+    } else {
+      const txt = await (await fetch('/api/data.js?t=' + Date.now(), {cache:'no-store'})).text();
+      D = JSON.parse(txt.slice(txt.indexOf('=') + 1).replace(/;\s*$/, ''));
+    }
+    if(!D) throw new Error('数据未加载');
+    if(D.locked || !(D.customers||[]).length){
+      $('cnt').textContent = '';
+      $('tb').innerHTML = `<tr><td class="empty" colspan="${COLS.length}">未登录或数据未加载：请先回到看板登录一次，再打开本页。</td></tr>`;
+      return;
+    }
+    DATA = D.customers;
+    // 过滤下拉
+    const opts = (arr) => [...new Set(arr.filter(Boolean))].sort();
+    opts(DATA.map(c=>c.mgr)).forEach(x => $('fMgr').add(new Option(x, x)));
+    opts(DATA.map(c=>c.ver)).forEach(x => $('fVer').add(new Option(x, x)));
+    opts(DATA.map(c=>c.effectLevel)).forEach(x => $('fEff').add(new Option(x, x)));
+    ['fMgr','fVer','fEff'].forEach(id => $(id).onchange = render);
+    $('fQ').oninput = render;
+    // 数据自检：缺精准率说明拿到的是旧数据
+    const miss = DATA.filter(c=>c.prec==null && c.unlockRatio==null).length;
+    if(miss / DATA.length > 0.8){
+      const w = $('warn');
+      w.className = 'warnbar show';
+      w.innerHTML = '⚠️ 检测到加载的是【旧版数据文件】（精准率/解锁率等字段为空：' + miss + '/' + DATA.length + ' 家）。' +
+                    '请按 <b>Cmd + Shift + R</b> 强制刷新本页；若仍如此，把这个提示截图发给 Loomy。';
+    }
+    render();
+  }catch(e){
+    $('tb').innerHTML = `<tr><td class="empty" colspan="${COLS.length}">加载失败：${e.message}</td></tr>`;
+  }
+  // 水印
+  try{
+    const me = await (await fetch('/api/me', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).json();
+    if(me && me.ok){
+      const txt = (me.account||me.nickname||'user') + ' · ' + (me.loginAt||'');
+      const c = document.createElement('canvas'), W=520,H=300;
+      c.width=W; c.height=H;
+      const g=c.getContext('2d');
+      g.translate(W/2,H/2); g.rotate(-15*Math.PI/180);
+      g.font='600 26px -apple-system,sans-serif'; g.fillStyle='rgba(15,23,42,.055)'; g.textAlign='center';
+      [-95,0,95].forEach(dy=>g.fillText(txt,0,dy));
+      const w=$('wm'); w.style.backgroundImage='url('+c.toDataURL()+')'; w.style.backgroundRepeat='repeat'; w.style.display='block';
+    }
+  }catch(e){}
+  // 防复制（不阻断拖拽，因为本页无拖拽需求）
+  ['copy','cut','contextmenu'].forEach(ev=>document.addEventListener(ev, e=>{
+    if(e.target && e.target.closest && e.target.closest('input,select')) return;
+    e.preventDefault();
+  }, true));
+}
+boot();
+</script>
+</body>
+</html>

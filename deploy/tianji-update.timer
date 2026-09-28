@@ -1,0 +1,17 @@
+# =====================================================================
+# 天玑 · 每日数据抓取定时器
+# 每天 06:30 触发（错过则开机后补跑），带 5 分钟随机延迟避免整点拥塞
+# 安装见 tianji-update.service 头部注释
+# 查看下次触发时间：  systemctl list-timers | grep tianji
+# =====================================================================
+[Unit]
+Description=Run Tianji BI data refresh every day
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=tianji-update.service
+
+[Install]
+WantedBy=timers.target

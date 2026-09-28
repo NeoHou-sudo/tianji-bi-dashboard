@@ -1,0 +1,48 @@
+# =====================================================================
+# 天玑 · 售后看板 —— Cloudflare Worker 配置
+# 首次部署前只需三步：
+#   1) npx wrangler login
+#   2) npx wrangler kv namespace create BI_KV      ← 把返回的 id 填到下面
+#   3) npx wrangler secret put BI_SESSION_SECRET   ← 粘一段随机字符串（签名用）
+# =====================================================================
+
+name = "tianji-bi"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 前端静态文件（由 build_cf_pages.py 生成到 public/）
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# 站点数据（data.js）放在 KV 里：不随站点公开，只有登录后的请求才拿得到
+[[kv_namespaces]]
+binding = "BI_KV"
+id = "707f7829f50e48ef9a01fcc0ca41d747"
+
+# 可选：如果你更想用 R2 存数据，把上面 kv 那段注释掉，改用下面这段（R2 需先开通）
+# [[r2_buckets]]
+# binding = "BI_DATA"
+# bucket_name = "tianji-data"
+
+[vars]
+BI_TS_BASE = "https://ts.baixyn.com"
+# 听言系统（用于识别登录人身份：同一套账号密码登录后取听言昵称）
+BI_TY_BASE = "https://collocation-alert.baixyn.com"
+# 可选白名单：只允许这些天枢账号登录，逗号分隔；留空 = 所有天枢账号都能登
+BI_ALLOWED_ACCOUNTS = ""
+# 看全部数据的账号/姓名（主管、管理员），逗号分隔；其他人只看到「客户成功经理=本人」的客户
+# 看全部数据的姓名/账号（主管、管理员），逗号分隔；其余人只看「听言昵称=客户成功经理」的客户
+BI_SCOPE_ALL = "侯子昱,ziyu,李莉,lily,18320976850"
+
+# 发短信中继队列（Durable Object，强一致，免费版可用 SQLite 后端）
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "RelayQueue"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelayQueue"]
+
+[observability]
+enabled = true

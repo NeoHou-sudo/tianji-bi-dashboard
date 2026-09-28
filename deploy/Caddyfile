@@ -1,0 +1,39 @@
+# =====================================================================
+# 天玑 · 售后看板  ·  Caddy 反向代理 + 自动 HTTPS
+# 放到 /etc/caddy/Caddyfile，把域名换成你自己的，然后：
+#   sudo systemctl reload caddy
+# Caddy 会自动向 Let's Encrypt 申请并续期证书（需域名已解析到本机 + 80/443 放行）
+# =====================================================================
+
+bi.example.com {
+    encode gzip zstd
+
+    # 反向代理到本地后端（后端只绑 127.0.0.1，不直接暴露公网）
+    reverse_proxy 127.0.0.1:8899 {
+        # 批量生成一次可能跑很久，放宽超时
+        transport http {
+            read_timeout 1h
+            write_timeout 1h
+        }
+    }
+
+    # 基础安全响应头
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # 可选：只允许公司出口 IP 访问（按需打开，最狠的一层）
+    # @allowed remote_ip 1.2.3.4 5.6.7.8
+    # handle @allowed { reverse_proxy 127.0.0.1:8899 }
+    # respond 403
+}
+
+# ---- 如果暂时没有域名，可用自签证书先跑（浏览器会告警，仅内测）----
+# https://<服务器公网IP> {
+#     tls internal
+#     reverse_proxy 127.0.0.1:8899
+# }

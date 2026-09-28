@@ -1,0 +1,39 @@
+# =====================================================================
+# 天玑 · 售后看板  systemd 服务
+# 安装：
+#   sudo cp deploy/tianji-bi.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tianji-bi
+# 查看：
+#   systemctl status tianji-bi ; journalctl -u tianji-bi -f
+# =====================================================================
+[Unit]
+Description=Tianji BI Server (客户续费看板)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tianji
+Group=tianji
+WorkingDirectory=/opt/tianji-bi
+EnvironmentFile=/opt/tianji-bi/.env
+ExecStart=/usr/bin/python3 /opt/tianji-bi/bi_server.py
+
+# 崩溃自动拉起
+Restart=always
+RestartSec=3
+# 长批量任务不设超时
+TimeoutStopSec=30
+
+# ---- 进程加固（最小权限）----
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/tianji-bi
+# 若要读写 ~/.baixyn-api 里的缓存，按需放开：
+# ReadWritePaths=/opt/tianji-bi /home/tianji/.baixyn-api
+
+[Install]
+WantedBy=multi-user.target
