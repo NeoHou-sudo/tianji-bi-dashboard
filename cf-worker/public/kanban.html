@@ -380,7 +380,9 @@ tbody tr:hover td:last-child{background:#f2f7ff}
 .ring-arc.do-sweep{transition:stroke-dashoffset .95s cubic-bezier(.22,.68,.2,1)}
 .ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1;letter-spacing:-.3px}
 /* ===== 信息说明（i）===== */
-#btnInfo{position:fixed;left:22px;bottom:22px;z-index:8000;width:42px;height:42px;border-radius:50%;border:1px solid var(--border);background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.12);cursor:pointer;font-size:17px;font-weight:700;color:#64748b;display:flex;align-items:center;justify-content:center;transition:.18s;font-family:Georgia,"Times New Roman",serif;font-style:italic}
+#btnInfo{display:none!important}
+#infoMask{display:none!important}
+#infoPanel{display:none!important}
 #btnInfo:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.18);color:#1d4ed8;border-color:#bfd4ff}
 #infoMask{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9200;opacity:0;pointer-events:none;transition:.25s}
 #infoMask.show{opacity:1;pointer-events:auto}
@@ -620,7 +622,7 @@ thead th{-webkit-user-drag:element}
 
       <h4>二、口径与计算方式</h4>
       <p>数据来源、字段口径、计算公式、评级阈值、诊断规则等，统一收敛到<b>内部口径文档</b>，不再在前端页面展示。</p>
-      
+      <p><a href="/doc" target="_blank" class="doc-link">📄 打开内部口径文档（需登录）</a></p>
 
       <h4>三、快捷操作</h4>
       <ul>
@@ -644,6 +646,16 @@ thead th{-webkit-user-drag:element}
 
 <script>
 const D = window.DASHBOARD_DATA;
+// 字段混淆映射（防止逆向计算逻辑）
+const _F = {
+  monthlyAvg:'ma', burnDate:'bd', expiryType:'et', effectLevel:'el',
+  score:'sc', advice:'rx', diagTags:'dt'
+};
+(D.customers||[]).forEach(c=>{
+  for(const[k,v] of Object.entries(_F)){
+    if(k in c){ c[v]=c[k]; delete c[k]; }
+  }
+});
 // 屏蔽测试/无效负责人（不计入看板任何统计）
 const HIDE_MGRS = ['未分配', '李嘉洲', '漠鹰'];
 D.customers = (D.customers || []).filter(c => !HIDE_MGRS.some(h => (c.mgr || '').includes(h)));
@@ -674,7 +686,7 @@ try{
   }
 }catch(e){}
 const colWidths = JSON.parse(localStorage.getItem('bi_colWidths') || '{}');
-const DEFAULT_W = { name:210, biz:170, end:96, lastFollowTime:96, lastFollowText:200, diag:320, monthlyAvg:96, dailyAvg:92, cnyLeft:100, burnDate:96, judge:104, effectLevel:104, avgPrice:96, mgr:84, ver:88 };
+const DEFAULT_W = { name:210, biz:170, end:96, lastFollowTime:96, lastFollowText:200, diag:320, ma:96, dailyAvg:92, cnyLeft:100, bd:96, judge:104, el:104, avgPrice:96, mgr:84, ver:88 };
 function colW(k){ return colWidths[k] || DEFAULT_W[k] || ''; }
 function saveColWidths(){ try{ localStorage.setItem('bi_colWidths', JSON.stringify(colWidths)); }catch(e){} }
 
@@ -740,7 +752,7 @@ buildDropdown('ddStatus','服务状态', uniq(D.customers.map(c=>c.status)), nul
 buildDropdown('ddExpiry','到期类型', ['点数到期','时长到期','未测算'], {'点数到期':'#dc2626','时长到期':'#0ea5e9','未测算':'#94a3b8'}, 'expiries');
 buildDropdown('ddEffect','效果评级', ['A·优质标杆','B·效果良好','C·效果一般','D·待改善'], EFF_COLOR, 'effects');
 buildDropdown('ddVer','系统版本', uniq(D.customers.map(c=>c.ver||'未知')), {'Zoe老流':C.blue,'Zoe新匹配流':C.cyan,'OntoZ':C.purple,'未知':C.gray}, 'vers');
-const diagCount={}; D.customers.forEach(c=>{ (c.diagTags||[c.diag]).forEach(t=>{ diagCount[t]=(diagCount[t]||0)+1; }); });
+const diagCount={}; D.customers.forEach(c=>{ (c.dt||[c.diag]).forEach(t=>{ diagCount[t]=(diagCount[t]||0)+1; }); });
 buildDropdown('ddDiag','问题诊断', Object.keys(diagCount).sort((a,b)=>diagCount[b]-diagCount[a]), DIAG_COLOR, 'diags', diagCount);
 
 // 工具
@@ -818,9 +830,9 @@ function filtered(exclude){
     if(!sk('judge') && state.judges.length && !state.judges.includes(c.judge)) return false;
     if(!sk('risk') && state.risks.length && !state.risks.includes(c.risk)) return false;
     if(!sk('status') && state.statuses.length && !state.statuses.includes(c.status)) return false;
-    if(!sk('expiry') && state.expiries.length && !state.expiries.includes(c.expiryType || '未测算')) return false;
-    if(!sk('diag') && state.diags.length && !state.diags.some(d=> (c.diagTags||[c.diag]).includes(d))) return false;
-    if(!sk('effect') && state.effects.length && !state.effects.includes(c.effectLevel)) return false;
+    if(!sk('expiry') && state.expiries.length && !state.expiries.includes(c.et || '未测算')) return false;
+    if(!sk('diag') && state.diags.length && !state.diags.some(d=> (c.dt||[c.diag]).includes(d))) return false;
+    if(!sk('effect') && state.effects.length && !state.effects.includes(c.el)) return false;
     if(!sk('ver') && state.vers.length && !state.vers.includes(c.ver||'未知')) return false;
     if(state.q){
       const q = state.q.toLowerCase();
@@ -845,7 +857,7 @@ function renderKPI(rows){
   const crit = rows.filter(c=>c.risk==='CRITICAL').length;
   const aliveRows = rows.filter(c=>c.alive);
   const deadRows = rows.filter(c=>!c.alive);
-  const monthlyAlive = aliveRows.reduce((s,c)=>s+(c.monthlyAvg||0),0);
+  const monthlyAlive = aliveRows.reduce((s,c)=>s+(c.ma||0),0);
   const last30Alive = aliveRows.reduce((s,c)=>s+(c.last30||0),0);
   const burn90 = rows.filter(c=>c.daysToBurn!=null && c.daysToBurn>=0 && c.daysToBurn<=90).length;
   const cards = [
@@ -1002,7 +1014,7 @@ function renderManagers(){
     const hz = cs.filter(c=>c.daysLeft!=null && c.daysLeft>=0 && c.daysLeft<=30).length;
     const crit = cs.filter(c=>c.risk==='CRITICAL').length;
     const aliveC = cs.filter(c=>c.alive);
-    const monthlyAlive = aliveC.reduce((s,c)=>s+(c.monthlyAvg||0),0);
+    const monthlyAlive = aliveC.reduce((s,c)=>s+(c.ma||0),0);
     const avgMonthly = aliveC.length ? monthlyAlive/aliveC.length : 0;
     return `<div class="mcard ${state.mgr===m?'active':''}" data-mgr="${m}">
       <div class="m-name">${m}<span class="m-count">${odoSpan('mgr'+mi+'c', cnt+'家')}</span></div>
@@ -1044,15 +1056,15 @@ const COLS = [
   {k:'end',t:'服务期至'},
   {k:'daysLeft',t:'剩余服务天数',n:true},
   {k:'cnyLeft',t:'账户余额(元)',n:true},
-  {k:'monthlyAvg',t:'月均消耗(元)',n:true,money:true},
+  {k:'ma',t:'月均消耗(元)',n:true,money:true},
   {k:'dailyAvg',t:'日均消耗(元)',n:true,money:true},
-  {k:'burnDate',t:'额度耗尽预测'},
-  {k:'expiryType',t:'到期类型'},
+  {k:'bd',t:'额度耗尽预测'},
+  {k:'et',t:'到期类型'},
   {k:'nonWaInq',t:'非WhatsApp询盘',n:true},
   {k:'inqRatio',t:'询盘占比',n:true,pct:true},
   {k:'avgPrice',t:'平均询盘价(元)',n:true,money:true},
   {k:'score',t:'续约评分',n:true},
-  {k:'effectLevel',t:'效果评级'},
+  {k:'el',t:'效果评级'},
   {k:'risk',t:'风险等级'},
   {k:'judge',t:'续费判断'},
   {k:'diff',t:'续费难度'},
@@ -1097,10 +1109,10 @@ function renderTable(rows){
       end: ()=>`<td class="num" style="color:${c.daysLeft!=null&&c.daysLeft<0?'#dc2626':(c.daysLeft!=null&&c.daysLeft<=30?'#f59e0b':'#475569')};font-weight:${c.daysLeft!=null&&c.daysLeft<=30?'600':'400'}">${c.end||'—'}</td>`,
       daysLeft: ()=>`<td class="right num">${c.daysLeft==null?'—':c.daysLeft}</td>`,
       cnyLeft: ()=>`<td class="right num">${fmtMoney(c.cnyLeft)}</td>`,
-      monthlyAvg: ()=>`<td class="right num" style="color:#0f766e;font-weight:600">${c.monthlyAvg==null?'—':fmtMoney(c.monthlyAvg)}</td>`,
+      ma: ()=>`<td class="right num" style="color:#0f766e;font-weight:600">${c.ma==null?'—':fmtMoney(c.ma)}</td>`,
       dailyAvg: ()=>`<td class="right num">${c.dailyAvg==null?'—':fmtMoney(c.dailyAvg)}</td>`,
-      burnDate: ()=>`<td class="right num" style="color:${c.expiryType==='点数到期'?'#dc2626':'#64748b'};font-weight:${c.burnDate?'600':'400'}">${c.burnDate||'—'}</td>`,
-      expiryType: ()=>`<td class="statcell">${c.expiryType?`<span class="tag" data-tip="到期类型：${c.expiryType}" style="background:${c.expiryType==='点数到期'?'#dc26261a':'#0ea5e91a'};color:${c.expiryType==='点数到期'?'#dc2626':'#0ea5e9'}">${c.expiryType}</span>`:'—'}</td>`,
+      bd: ()=>`<td class="right num" style="color:${c.et==='点数到期'?'#dc2626':'#64748b'};font-weight:${c.bd?'600':'400'}">${c.bd||'—'}</td>`,
+      et: ()=>`<td class="statcell">${c.et?`<span class="tag" data-tip="到期类型：${c.et}" style="background:${c.et==='点数到期'?'#dc26261a':'#0ea5e91a'};color:${c.et==='点数到期'?'#dc2626':'#0ea5e9'}">${c.et}</span>`:'—'}</td>`,
       nonWaInq: ()=>`<td class="right num">${c.nonWaInq??0}</td>`,
       inqRatio: ()=> c.inqRatio==null ? '<td class="right num">—</td>' : `<td class="num" style="text-align:center">${ringHTML(c.inqRatio, '', {size:38, stroke:4, fs:9, static:true, label:(c.inqRatio).toFixed(2)+'%'})}</td>`,
       prec: ()=>`<td class="right num">${c.prec==null?'—':c.prec+'%'}</td>`,
@@ -1114,18 +1126,18 @@ function renderTable(rows){
       openRatio: ()=>`<td class="right num">${c.openRatio==null?'—':(c.openRatio*100).toFixed(1)+'%'}</td>`,
       emailInqRate: ()=>`<td class="right num">${c.emailInqRate==null?'—':c.emailInqRate+'%'}</td>`,
       avgPrice: ()=>`<td class="right num">${c.avgPrice==null?'—':fmtMoney(c.avgPrice)}</td>`,
-      score: ()=>`<td class="right num">${c.score??'—'}</td>`,
-      effectLevel: ()=>`<td class="statcell">${c.effectLevel?`<span class="tag" data-tip="效果评级：${c.effectLevel}（综合精准率/询盘/性价比）" style="background:${(EFF_COLOR[c.effectLevel]||'#94a3b8')}1a;color:${EFF_COLOR[c.effectLevel]||'#94a3b8'}">${c.effectLevel}</span>`:'—'}</td>`,
+      sc: ()=>`<td class="right num">${c.sc??'—'}</td>`,
+      el: ()=>`<td class="statcell">${c.el?`<span class="tag" data-tip="效果评级：${c.el}（综合精准率/询盘/性价比）" style="background:${(EFF_COLOR[c.el]||'#94a3b8')}1a;color:${EFF_COLOR[c.el]||'#94a3b8'}">${c.el}</span>`:'—'}</td>`,
       risk: ()=>`<td class="statcell"><span class="tag" data-tip="风险等级：${c.risk}（危险指数 ${c.riskScore||0}）" style="background:${rc}1a;color:${rc}">${c.risk}</span></td>`,
       judge: ()=>`<td class="statcell"><span class="tag" data-tip="续费判断：${c.judge}" style="background:${jc}1a;color:${jc}">${c.judge}</span></td>`,
       diff: ()=>`<td class="statcell"><span class="tag" data-tip="续费难度：${c.diff}" style="background:${dc}1a;color:${dc}">${c.diff}</span></td>`,
       lastFollowTime: ()=>`<td class="num" style="color:${c.lastFollowTime?'#475569':'#cbd5e1'};white-space:nowrap">${c.lastFollowTime||'无记录'}${c.lastFollowBy?`<br><span style="font-size:11px;color:#94a3b8">${c.lastFollowBy}</span>`:''}</td>`,
       lastFollowText: ()=>`<td class="followcell" data-tip="${(c.lastFollowText||'暂无售后服务记录').replace(/"/g,'')}\n跟进人：${c.lastFollowBy||'—'}　时间：${c.lastFollowTime||'—'}">${c.lastFollowText? c.lastFollowText.slice(0,28)+(c.lastFollowText.length>28?'…':'') : '—'}</td>`,
       diag: ()=>`<td class="diagcell">${(function(){
-        const tags=(c.diagTags&&c.diagTags.length)?c.diagTags:[c.diag];
+        const tags=(c.dt&&c.dt.length)?c.dt:[c.diag];
         const root=stripParen(tags[0]);
         const col=DIAG_COLOR[tags[0]]||'#94a3b8';
-        const full = "全部问题：" + tags.map(stripParen).join(" → ") + (c.advice?("\n建议："+c.advice):"");
+        const full = "全部问题：" + tags.map(stripParen).join(" → ") + (c.rx?("\n建议："+c.rx):"");
         const more = tags.length>1 ? `<span class="tag" style="background:#e2e8f0;color:#64748b">+${tags.length-1}</span>` : '';
         return `<span class="tag" data-tip="${full.replace(/"/g,'')}" style="background:${col}1a;color:${col};font-weight:600">${root}</span>${more}`;
       })()}</td>`,
@@ -1278,7 +1290,7 @@ function exportCSV(){
   const full = isFullAccess();
   if(full){
     // 完整导出：全部列 + 问题标签/建议
-    const extra = [{k:'diagTags',t:'问题标签'},{k:'advice',t:'建议动作'}];
+    const extra = [{k:'dt',t:'问题标签'},{k:'rx',t:'建议动作'}];
     const all = [...COLS, ...extra];
     const esc = v => {
       let s = (v==null) ? '' : (Array.isArray(v) ? v.join('；') : String(v));
@@ -1328,7 +1340,7 @@ const FIX_MAP = {
 function stripParen(s){ return String(s).replace(/\(.*?\)/g,''); }
 
 function fixPlanText(c){
-  const tags = (c.diagTags && c.diagTags.length) ? c.diagTags : [c.diag];
+  const tags = (c.dt && c.dt.length) ? c.dt : [c.diag];
   const is3 = (c.ver||'').includes('OntoZ');
   const needs = [];
   if(tags.some(t=>t.includes('客户池不足')||t.includes('准确率低'))) needs.push(is3?'3.0（OntoZ）配词方案':'2.5（Zoe）配词方案');
@@ -1345,7 +1357,7 @@ function fixPlanText(c){
 - 客户成功经理：${c.mgr||'—'}
 - 服务状态：${c.status||'—'}${c.daysLeft!=null?`（剩余 ${c.daysLeft} 天）`:''}
 - 账户剩余余额：${money(c.cnyLeft)}
-- 预计额度耗尽：${c.burnDate? c.burnDate : '—'}${c.expiryType?`（${c.expiryType}）`:''}
+- 预计额度耗尽：${c.bd? c.bd : '—'}${c.et?`（${c.et}）`:''}
 
 ## 二、当前表现
 - 客户池规模：${(c.pool||0).toLocaleString('zh-CN')} 条
@@ -1467,7 +1479,7 @@ document.querySelectorAll('.foldhead').forEach(h=>{
 // 优质案例（按行业归类，每类精选最佳客户）
 function renderTopCases(){
   const byCat = {};
-  D.customers.filter(c=>c.effectLevel && c.nonWaInq>0).forEach(c=>{
+  D.customers.filter(c=>c.el && c.nonWaInq>0).forEach(c=>{
     const k = c.catCn || '其他';
     (byCat[k] = byCat[k] || []).push(c);
   });
@@ -1479,14 +1491,14 @@ function renderTopCases(){
   document.getElementById('topgrid').innerHTML = groups.map(([cat, arr])=>{
     const best = arr[0];
     const lines = arr.slice(0,2).map(c=>{
-      const col = EFF_COLOR[c.effectLevel]||'#10b981';
+      const col = EFF_COLOR[c.el]||'#10b981';
       return `<div class="case-row" data-case="${c.name.replace(/"/g,'')}" style="cursor:pointer;padding:3px 0;border-top:1px dashed #eef2f7">
         <span style="font-size:12px">${c.name.length>15?c.name.slice(0,15)+'…':c.name}</span>
-        <span style="font-size:11px;color:${col};font-weight:600;margin-left:6px">${c.effectLevel.slice(0,1)}</span>
+        <span style="font-size:11px;color:${col};font-weight:600;margin-left:6px">${c.el.slice(0,1)}</span>
         <span style="font-size:11px;color:#64748b;margin-left:6px">询盘${c.nonWaInq}·精准${c.prec!=null?c.prec+'%':'—'}</span>
       </div>`;
     }).join('');
-    return `<div class="mcard" data-cat="${cat.replace(/"/g,'')}" style="cursor:pointer;border-left:3px solid ${EFF_COLOR[best.effectLevel]||'#10b981'}">
+    return `<div class="mcard" data-cat="${cat.replace(/"/g,'')}" style="cursor:pointer;border-left:3px solid ${EFF_COLOR[best.el]||'#10b981'}">
       <div class="m-name" style="font-size:13px">${cat}<span class="m-count">${arr.length}家</span></div>
       ${lines}
     </div>`;

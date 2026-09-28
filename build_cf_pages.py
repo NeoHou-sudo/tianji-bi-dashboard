@@ -97,8 +97,7 @@ MAIN_PATCHES = [
     # 6) 空态 colspan：checkbox 已隐藏（cf-hide），只需覆盖数据列 + 可能的修正列
     ('<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>',
      '<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>'),
-    # 7) 去掉「打开内部口径文档（需登录）」链接
-    ('<p><a href="/doc" target="_blank" class="doc-link">📄 打开内部口径文档（需登录）</a></p>', ''),
+    # 7) 口径文档已关闭（v1.5.0 安全加固），页面已无文档链接元素，无需补丁
     # 8) Cloudflare 版：一键修正按钮改为直接下载文本方案（不调 /api/fix_only）
     (
         'function renderLegend(){',

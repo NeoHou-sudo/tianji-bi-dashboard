@@ -126,7 +126,7 @@ const COLS = [
   {k:'inqRatio',     t:'询盘占比',  w:'right', pct:'raw'},
   {k:'judge',        t:'续费判断',  w:'left'},
   {k:'diff',         t:'续费难度',  w:'left'},
-  {k:'effectLevel',  t:'效果评级',  w:'left'},
+  {k:'el',  t:'效果评级',  w:'left'},
   {k:'diag',         t:'问题诊断',  w:'left'},
   {k:'balanceBar',   t:'余额进度',  w:'left'}
 ];
@@ -148,7 +148,7 @@ function cell(c, col){
     const col2 = (p==null || isNaN(p)) ? '#94a3b8' : (p>=50?'#10b981':(p>=25?'#f59e0b':'#ef4444'));
     return `<td class="right" style="color:${col2};font-weight:600">${v}</td>`;
   }
-  if(col.k==='effectLevel' && v!=='—'){
+  if(col.k==='el' && v!=='—'){
     const m = {'A':'#10b981','B':'#3b82f6','C':'#f59e0b','D':'#ef4444'};
     const cc = m[String(v).charAt(0)] || '#94a3b8';
     return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
@@ -159,7 +159,7 @@ function cell(c, col){
     return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
   }
   if(col.k==='balanceBar'){
-    const bal = Number(c.cnyLeft)||0, mo = Number(c.monthlyAvg)||0;
+    const bal = Number(c.cnyLeft)||0, mo = Number(c.ma)||0;
     if(!bal && !mo) return '<td class="left">—</td>';
     const months = mo>0 ? bal/mo : (bal>0?Infinity:0);
     const pct = mo>0 ? Math.min(100, months/6*100) : (bal>0?100:0);
@@ -176,11 +176,11 @@ function rows(){
   let r = DATA.filter(c => !HIDE.some(h => (c.mgr||'').indexOf(h) >= 0));
   if(m) r = r.filter(c => c.mgr === m);
   if(v) r = r.filter(c => (c.ver||'') === v);
-  if(e) r = r.filter(c => (c.effectLevel||'') === e);
+  if(e) r = r.filter(c => (c.el||'') === e);
   if(q) r = r.filter(c => (c.name||'').toLowerCase().includes(q) || (c.catCn||'').toLowerCase().includes(q));
   r.sort((a,b)=>{
     let x=a[sortKey], y=b[sortKey];
-    if(sortKey==='effectLevel'){ x=rank(x); y=rank(y); }
+    if(sortKey==='el'){ x=rank(x); y=rank(y); }
     else if(typeof x==='number' || typeof y==='number'){ x=Number(x)||0; y=Number(y)||0; }
     else { x=String(x==null?'':x); y=String(y==null?'':y); }
     if(x<y) return sortDesc?1:-1;
@@ -223,7 +223,7 @@ function exportCSV(){
   // 完整导出
   const val = (c,col)=>{
     if(col.k==='prec')  return c.prec==null ? '' : c.prec + '%';
-    if(col.k==='balanceBar') return (c.cnyLeft==null?'':'¥'+Math.round(c.cnyLeft).toLocaleString('zh-CN')) + '/' + (c.monthlyAvg>0?(c.cnyLeft/c.monthlyAvg).toFixed(1)+'月':'—');
+    if(col.k==='balanceBar') return (c.cnyLeft==null?'':'¥'+Math.round(c.cnyLeft).toLocaleString('zh-CN')) + '/' + (c.ma>0?(c.cnyLeft/c.ma).toFixed(1)+'月':'—');
     if(col.pct===100)   return c[col.k]==null ? '' : (c[col.k]*100).toFixed(1) + '%';
     if(col.pct==='raw') return c[col.k]==null ? '' : c[col.k] + '%';
     return c[col.k]==null ? '' : c[col.k];
@@ -251,11 +251,14 @@ async function boot(){
       return;
     }
     DATA = D.customers;
+    // 字段混淆（防止逆向计算逻辑）
+    const _F = { monthlyAvg:'ma', burnDate:'bd', expiryType:'et', effectLevel:'el', score:'sc', advice:'rx', diagTags:'dt' };
+    DATA.forEach(c=>{ for(const[k,v] of Object.entries(_F)){ if(k in c){ c[v]=c[k]; delete c[k]; } } });
     // 过滤下拉
     const opts = (arr) => [...new Set(arr.filter(Boolean))].sort();
     opts(DATA.map(c=>c.mgr)).forEach(x => $('fMgr').add(new Option(x, x)));
     opts(DATA.map(c=>c.ver)).forEach(x => $('fVer').add(new Option(x, x)));
-    opts(DATA.map(c=>c.effectLevel)).forEach(x => $('fEff').add(new Option(x, x)));
+    opts(DATA.map(c=>c.el)).forEach(x => $('fEff').add(new Option(x, x)));
     ['fMgr','fVer','fEff'].forEach(id => $(id).onchange = render);
     $('fQ').oninput = render;
     // 数据自检：缺精准率说明拿到的是旧数据

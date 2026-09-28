@@ -263,46 +263,7 @@ TY_LOGIN_URL = os.environ.get("TY_LOGIN_URL", "https://collocation-alert.baixyn.
 PROGRESS_FILE = os.path.join(BASE, "_progress.json")
 
 
-DOC_HTML = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>天玑 · 口径文档（内部）</title><style>
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:820px;margin:40px auto;padding:0 22px;color:#334155;line-height:1.9}
-h1{font-size:20px;color:#0f172a}h2{font-size:15px;color:#0f172a;margin-top:26px;padding-left:9px;border-left:3px solid #3b82f6}
-code{background:#f1f5f9;border-radius:5px;padding:1px 6px;color:#0f766e}
-.note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px}
-</style></head><body>
-<h1>天玑 · 售后看板 · 口径文档（内部）</h1>
-<p class="note">本页含全部数据计算方式与判定阈值，<b>仅登录后可见</b>，不在前端页面展示。</p>
-<h2>一、数据来源</h2>
-<ul><li>天枢售后面板：余额、服务期、客户池、风险等级、负责人</li>
-<li>天枢 Zoe 运营统览：询盘、触达邮件数、打开率</li>
-<li>听言配词诊断：版本、精准率、解锁率、问题诊断、搜索词</li>
-<li>售后服务记录：历次跟进人/时间/内容（另：听言「用户基础信息」只读接口补充行业与产品目录）</li></ul>
-<h2>二、口径</h2>
-<ul><li>余额取天枢「剩余点数」；Zoe 1点=1元，OntoZ 17点=1元</li>
-<li>非WhatsApp询盘 = 真实询盘 − WhatsApp询盘；金额单位均为人民币元</li>
-<li>屏蔽测试/无效负责人（未分配、李嘉洲、漠鹰）</li></ul>
-<h2>三、计算公式</h2>
-<ul><li>日均消耗 = 已消耗服务价值 ÷ 服务天数</li>
-<li>月均消耗 = 日均消耗 × 30</li>
-<li>额度耗尽预测 = 账户余额 ÷ 日均消耗</li>
-<li>到期类型：点数到期 = 额度先耗尽；时长到期 = 服务期先到</li>
-<li>续约评分（满分5）= 询盘占比(≥0.9%得2 / ≥0.4%得1) + 询盘均价(≤1000得2 / ≤2000得1) + 30天内登录(+1)</li></ul>
-<h2>四、效果评级</h2>
-<p>精准率(≥60% +2 / ≥40% +1) + 非WhatsApp询盘(≥10 +2 / ≥3 +1) + 询盘占比(≥0.9% +2 / ≥0.4% +1) + 询盘均价(≤1000 +1)</p>
-<ul><li>≥5 → A·优质标杆；≥4 → B·效果良好；≥2 → C·效果一般；否则 D·待改善</li></ul>
-<h2>五、续费判断</h2>
-<ul><li>无数据 → 数据缺失；已过期 → 已到期待挽回（高）</li>
-<li>≤30天且评分≥3 → 优先谈续费（低）；≤30天 → 风险流失预警（高）</li>
-<li>≤90天且评分≥3 → 提前铺续费（低）；评分≥3 → 健康维护（低）</li>
-<li>评分=2 → 常规维护（中）；其它 → 效果存疑需干预（中）</li></ul>
-<h2>六、问题诊断（漏斗，上游→下游）</h2>
-<ul><li>L1 客户池 &lt; 2000 → 客户池不足</li><li>L2 精准率 &lt; 30% → 准确率低</li>
-<li>L3 解锁率 &lt; 10% → 未解锁受限(2.0) / 解锁率低(3.0)</li>
-<li>L4 打开率 &lt; 6% → 邮件打开差</li><li>L5 邮件询盘率 &lt; 0.5% → 邮件转化差</li></ul>
-<p class="note">「问题诊断」列展示最上游根因；悬停可见全部标签与建议动作。</p>
-<h2>七、覆盖看板时间窗口</h2>
-<p>「近 N 天未覆盖」= 最近跟进时间早于「数据快照日 − N 天」；窗口 7/14/30/45/60/90 天。</p>
-</body></html>"""
+DOC_HTML = ""  # 口径文档已关闭，不再暴露计算逻辑
 
 RATE = {}                      # ip -> [窗口开始, 计数]
 RATE_LIMIT = int(os.environ.get("BI_RATE_LIMIT", "300"))   # 每 IP 每分钟
@@ -433,6 +394,7 @@ def upload_to_drive(local_path):
 
 sys.path.insert(0, BASE)
 import gen_fix  # 生成引擎
+import cred_store  # 凭证留档系统
 
 
 def load_customer(name):
@@ -582,15 +544,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                           str(self.headers.get("User-Agent") or "")[:90]))
         except Exception:
             pass
-        # ---- 口径文档：仅登录可见（前端不展示计算方式）----
+        # ---- 口径文档已关闭（v1.5.0 安全加固）----
         if path in ("/doc", "/doc.html"):
-            if not self._session():
-                self._json({"ok": False, "error": "未登录"}, 401); return
-            body = DOC_HTML.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers(); self.wfile.write(body); return
+            self._json({"ok": False, "error": "页面不存在"}, 404); return
         # ---- 页面：自动给 data.js 带上「数据文件修改时间」版本号（根治缓存，且不依赖前端技巧）----
         if path.endswith(".html") and "/" not in path.strip("/"):
             _fp = os.path.join(BASE, path.lstrip("/"))
@@ -686,7 +642,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not rate_ok(ip):
             self._json({"ok": False, "error": "请求过于频繁，请稍后再试"}, 429); return
         path = urlparse(self.path).path
-        if path not in ("/api/fix", "/api/fix_only", "/api/batch", "/api/status", "/api/send-code", "/api/login", "/api/me", "/api/logout", "/api/history/upload", "/api/history/delete", "/api/refresh"):
+        if path not in ("/api/fix", "/api/fix_only", "/api/batch", "/api/status", "/api/send-code", "/api/login", "/api/me", "/api/logout", "/api/history/upload", "/api/history/delete", "/api/refresh", "/api/cred/add", "/api/cred/get", "/api/cred/list"):
             self._json({"ok": False, "error": "unknown endpoint"}, 404); return
         try:
             ln = int(self.headers.get("Content-Length", 0))
@@ -739,6 +695,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 s = self._session()
                 if s: sess_del(s["sid"])
                 self._json({"ok": True}); return
+            # ---- 凭证留档系统（仅 admin）----
+            if path == "/api/cred/add":
+                s = self._session()
+                if not s or not cred_store.is_admin(s.get("username", "")):
+                    self._json({"ok": False, "error": "仅管理员可操作"}); return
+                name = (req.get("name") or "").strip()
+                username = (req.get("username") or "").strip()
+                password = req.get("password") or ""
+                if not name or not username or not password:
+                    self._json({"ok": False, "error": "name/username/password 均必填"}); return
+                cred_store.add_cred(name, username, password, req.get("note", ""))
+                cred_store._audit("ADD", s["username"], name)
+                self._json({"ok": True, "name": name}); return
+            if path == "/api/cred/get":
+                s = self._session()
+                if not s or not cred_store.is_admin(s.get("username", "")):
+                    self._json({"ok": False, "error": "仅管理员可操作"}); return
+                name = (req.get("name") or "").strip()
+                cred = cred_store.get_cred(name)
+                if not cred:
+                    self._json({"ok": False, "error": "未找到该凭证"}); return
+                cred_store._audit("GET", s["username"], name)
+                self._json({"ok": True, **cred}); return
+            if path == "/api/cred/list":
+                s = self._session()
+                if not s or not cred_store.is_admin(s.get("username", "")):
+                    self._json({"ok": False, "error": "仅管理员可操作"}); return
+                cred_store._audit("LIST", s["username"])
+                self._json({"ok": True, "records": cred_store.list_names()}); return
             # ---- 状态查询 ----
             if path == "/api/status":
                 self._json({"ok": True, "used_today": gen_fix.daily_used(),
