@@ -54,9 +54,9 @@ def cache_key(cust, kind):
     if kind == "email":
         try:
             st = os.stat(EMAIL_SPEC_FILE)
-            fp += f"|spec{int(st.st_mtime)}-{st.st_size}"
+            fp += f"|spec{int(st.st_mtime)}-{st.st_size}|f2"   # f2 = 每轮独立文件格式
         except Exception:
-            fp += "|spec?"
+            fp += "|spec?|f2"
     return f"{cust['name']}||{kind}||{fp}"
 
 
