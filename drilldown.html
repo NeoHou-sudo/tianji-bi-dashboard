@@ -133,7 +133,7 @@ const COLS = [
   {k:'diff',         t:'续费难度',  w:'left'},
   {k:'el',  t:'效果评级',  w:'left'},
   {k:'diag',         t:'问题诊断',  w:'left'},
-  {k:'balanceBar',   t:'余额进度',  w:'left'}
+  {k:'balanceBar',   t:'剩余/总额', w:'left'}
 ];
 const HIDE = ['未分配','李嘉洲','漠鹰'];
 let DATA = [], sortKey = 'prec', sortDesc = true;
@@ -166,14 +166,15 @@ function cell(c, col){
     return `<td><span class="pill" style="background:${cc}1a;color:${cc}">${v}</span></td>`;
   }
   if(col.k==='balanceBar'){
-    const bal = Number(c.cnyLeft)||0, mo = Number(c.ma)||0;
-    if(!bal && !mo) return '<td class="left">—</td>';
-    const months = mo>0 ? bal/mo : (bal>0?Infinity:0);
-    const pct = mo>0 ? Math.min(100, months/6*100) : (bal>0?100:0);
-    const col2 = months>=3?'#10b981':(months>=1?'#f59e0b':'#ef4444');
-    const moTxt = months===Infinity?'∞':(months.toFixed(1)+'月');
-    const balTxt = '¥'+Math.round(bal).toLocaleString('zh-CN');
-    return `<td class="left"><span class="balbar"><i style="width:${pct}%;background:${col2}"></i></span><span class="baltxt">${balTxt} / ${moTxt}</span></td>`;
+    const bal = Number(c.cnyLeft)||0, used = Number(c.cnyUsed)||0;
+    const total = bal + used;   // 充值总额 = 剩余 + 已消耗
+    if(bal===0 && used===0) return '<td class="left">—</td>';
+    const ratio = total > 0 ? Math.max(0, bal / total) : 0;   // 剩余占总额比例（超支按 0）
+    const pct = Math.min(100, ratio * 100);
+    const col2 = ratio >= 0.6 ? '#10b981' : (ratio >= 0.3 ? '#f59e0b' : '#ef4444');
+    const balTxt = '¥' + Math.round(bal).toLocaleString('zh-CN');
+    const totalTxt = '¥' + Math.round(total).toLocaleString('zh-CN');
+    return `<td class="left"><span class="balbar"><i style="width:${pct}%;background:${col2}"></i></span><span class="baltxt">${balTxt} / ${totalTxt}</span></td>`;
   }
   return `<td class="${col.w==='right'?'right':''}${col.k==='name'?' name':''}">${v}</td>`;
 }
@@ -241,7 +242,7 @@ function exportCSV(){
   // 完整导出
   const val = (c,col)=>{
     if(col.k==='prec')  return c.prec==null ? '' : c.prec + '%';
-    if(col.k==='balanceBar') return (c.cnyLeft==null?'':'¥'+Math.round(c.cnyLeft).toLocaleString('zh-CN')) + '/' + (c.ma>0?(c.cnyLeft/c.ma).toFixed(1)+'月':'—');
+    if(col.k==='balanceBar'){ const _bal=Number(c.cnyLeft)||0, _used=Number(c.cnyUsed)||0, _tot=_bal+_used; return '¥'+Math.round(_bal).toLocaleString('zh-CN') + '/' + (_tot>0?'¥'+Math.round(_tot).toLocaleString('zh-CN'):'—'); }
     if(col.pct===100)   return c[col.k]==null ? '' : (c[col.k]*100).toFixed(1) + '%';
     if(col.pct==='raw') return c[col.k]==null ? '' : c[col.k] + '%';
     return c[col.k]==null ? '' : c[col.k];
