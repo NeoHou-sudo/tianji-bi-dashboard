@@ -920,7 +920,7 @@ function renderCharts(rows){
   // 续费判断环形（排除自身维度，可连续点选）
   const jrows = filtered();
   const jc = {}; jrows.forEach(c=>jc[c.judge]=(jc[c.judge]||0)+1);
-  const jdata = JUDGE_ORDER.filter(j=>jc[j]).map(j=>({name:j,value:jc[j],itemStyle:{color:JUDGE_COLOR[j]}}));
+  const jdata = JUDGE_ORDER.filter(j=>jc[j]).map(j=>({name:j,value:jc[j],itemStyle:{color:JUDGE_COLOR[j]},selected: state.judges.length===1 && state.judges[0]===j}));
   const chJ = initChart('cJudge');
   chJ?.setOption({
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
@@ -938,7 +938,7 @@ function renderCharts(rows){
   // 风险等级
   const rrows = filtered();
   const rc={}; rrows.forEach(c=>rc[c.risk]=(rc[c.risk]||0)+1);
-  const rdata = Object.keys(RISK_COLOR).filter(r=>rc[r]).map(r=>({name:r,value:rc[r],itemStyle:{color:RISK_COLOR[r]}}));
+  const rdata = Object.keys(RISK_COLOR).filter(r=>rc[r]).map(r=>({name:r,value:rc[r],itemStyle:{color:RISK_COLOR[r]},selected: state.risks.length===1 && state.risks[0]===r}));
   const chR = initChart('cRisk');
   chR?.setOption({
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
@@ -956,7 +956,7 @@ function renderCharts(rows){
   const vrows = filtered();
   const vc={}; vrows.forEach(c=>vc[c.ver||'未知']=(vc[c.ver||'未知']||0)+1);
   const vcolor={'Zoe老流':C.blue,'Zoe新匹配流':C.cyan,'OntoZ':C.purple,'未知':C.gray};
-  const vdata=Object.keys(vc).map(v=>({name:v,value:vc[v],itemStyle:{color:vcolor[v]||C.gray}}));
+  const vdata=Object.keys(vc).map(v=>({name:v,value:vc[v],itemStyle:{color:vcolor[v]||C.gray},selected: state.vers.length===1 && state.vers[0]===v}));
   const chV = initChart('cVer');
   chV?.setOption({
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
