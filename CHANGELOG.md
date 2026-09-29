@@ -2,6 +2,11 @@
 
 > 每版对应一个 Git tag（vX.Y.Z），随 `./release.sh` 一起维护。
 
+## v1.5.4（2026-09-29）
+
+- **修复登录框验证码行溢出**：短信验证码输入框与「发送验证码」按钮同行 flex 布局时，按钮 `white-space:nowrap` 导致 `min-content` 宽度不可收缩，挤占输入框空间使按钮右缘超出白框内容区 6.5px。给输入框加 `min-width:0` 允许收缩，溢出归零；倒计时状态下按钮变宽仍自适应不溢出。
+- 修复覆盖 6 个文件：本机 3 个页面（tianji.html / index.html / kanban.html）+ 云端 3 个副本（cf-worker/public/）。
+
 ## v1.4.2（2026-09-28）
 
 - **移动端图表修复**：`initChart` 增加容器宽度校验，宽度为 0 时延迟初始化（setInterval 轮询重试）
