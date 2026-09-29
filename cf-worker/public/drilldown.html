@@ -110,7 +110,31 @@
   </div>
 </div>
 
+<script src="assets/config.js"></script>
 <script>
+// ===== 云端版：这些接口依赖本机服务，这里直接给占位结果，避免报错 =====
+(function(){
+  var LOCAL_ONLY = ['/api/status','/api/refresh','/api/history','/api/batch',
+                    '/api/fix','/api/fix_only','/api/download','/api/file'];
+  var _f = window.fetch.bind(window);
+  window.fetch = function(u, o){
+    try{
+      var s = (typeof u === 'string') ? u : ((u && u.url) || '');
+      var path = s.split('?')[0];
+      for(var i=0;i<LOCAL_ONLY.length;i++){
+        if(path.indexOf(LOCAL_ONLY[i]) >= 0){
+          var body = {ok:false, error:'云端只读版未启用该功能，请在本机看板操作', readonly:true};
+          if(path.slice(-19) === '/api/refresh/status') body = {ok:true, running:false, finished:false, progress:null, changed:false};
+          if(path.slice(-12) === '/api/history')        body = {ok:true, records:[]};
+          return Promise.resolve(new Response(JSON.stringify(body),
+            {status:200, headers:{'Content-Type':'application/json'}}));
+        }
+      }
+    }catch(e){}
+    return _f.apply(window, arguments);
+  };
+})();
+
 // ============ 独立下钻页：不依赖主页任何脚本，自己取数、自己渲染 ============
 const COLS = [
   {k:'name',         t:'客户名称',  w:'left'},
@@ -242,9 +266,17 @@ document.getElementById('btnExport').onclick = exportCSV;
 
 async function boot(){
   try{
-    const txt = await (await fetch('assets/data.js?t=' + Date.now(), {cache:'no-store'})).text();
-    const json = txt.slice(txt.indexOf('=') + 1).replace(/;\s*$/, '');
-    const D = JSON.parse(json);
+    let D;
+    if(window.BI_CONFIG && window.BI_CONFIG.dataUrl){
+      await new Promise((res, rej)=>{ const s = document.createElement('script');
+        s.src = window.BI_CONFIG.dataUrl; s.onload = res; s.onerror = ()=>rej(new Error('云端数据加载失败'));
+        document.head.appendChild(s); });
+      D = window.DASHBOARD_DATA;
+    } else {
+      const txt = await (await fetch('/api/data.js?t=' + Date.now(), {cache:'no-store'})).text();
+      D = JSON.parse(txt.slice(txt.indexOf('=') + 1).replace(/;\s*$/, ''));
+    }
+    if(!D) throw new Error('数据未加载');
     if(D.locked || !(D.customers||[]).length){
       $('cnt').textContent = '';
       $('tb').innerHTML = `<tr><td class="empty" colspan="${COLS.length}">未登录或数据未加载：请先回到看板登录一次，再打开本页。</td></tr>`;
