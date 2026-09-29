@@ -170,7 +170,7 @@ function cell(c, col){
     const total = bal + used;   // 充值总额 = 剩余 + 已消耗
     if(bal===0 && used===0) return '<td class="left">—</td>';
     const ratio = total > 0 ? Math.max(0, bal / total) : 0;   // 剩余占总额比例（超支按 0）
-    const pct = Math.min(100, ratio * 100);
+    const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));   // 整数百分比 0~100
     const col2 = ratio >= 0.6 ? '#10b981' : (ratio >= 0.3 ? '#f59e0b' : '#ef4444');
     const balTxt = '¥' + Math.round(bal).toLocaleString('zh-CN');
     const totalTxt = '¥' + Math.round(total).toLocaleString('zh-CN');
