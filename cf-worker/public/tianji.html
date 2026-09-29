@@ -538,6 +538,13 @@ thead th{-webkit-user-drag:element}
     <div class="mgrid foldbody" id="mgrid" style="margin-top:6px"></div>
   </div>
 
+  <div class="panel" style="margin-bottom:18px">
+    <h3 style="display:flex;justify-content:space-between;align-items:center"><span><span class="dot" style="background:var(--teal)"></span>一键透视</span>
+      <button class="btn primary" onclick="openDrilldown()" style="font-size:13px">📊 同步当前筛选</button>
+    </h3>
+    <p style="font-size:13px;color:#64748b;margin:8px 0">点击按钮可将当前看板的所有筛选条件同步至效果下钻页面，快速定位特定客户群体。</p>
+  </div>
+
   <div class="panel foldable" style="margin-bottom:18px">
     <h3 class="foldhead" data-target="covergrid"><span class="foldarrow" id="arr_covergrid">▶</span> <span class="dot" style="background:#f59e0b"></span>售后覆盖看板<span style="margin-left:auto;font-weight:400;font-size:12px;color:#64748b" onclick="event.stopPropagation()">近 <select id="coverDays" style="border:1px solid #cbd5e1;border-radius:6px;padding:1px 5px;font-size:12px;color:#334155;background:#fff"><option value="7">7</option><option value="14">14</option><option value="30" selected>30</option><option value="45">45</option><option value="60">60</option><option value="90">90</option></select> 天</span></h3>
     <div class="mgrid foldbody" id="covergrid" style="margin-top:6px"></div>
@@ -920,7 +927,10 @@ function renderCharts(rows){
     legend:{bottom:0,itemWidth:9,itemHeight:9,textStyle:{fontSize:11}},
     series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],avoidLabelOverlap:true,
       label:{show:false},cursor:'pointer',
-      emphasis:{itemStyle:{shadowBlur:10,shadowOffsetX:0,shadowColor:'rgba(0, 0, 0, 0.5)'},scale:true,scaleSize:8},
+      emphasis:{itemStyle:{shadowBlur:15,shadowOffsetX:0,shadowColor:'rgba(0, 0, 0, 0.5)'},scale:true,scaleSize:30,
+        label:{show:true,position:'center',fontSize:16,fontWeight:'bold',formatter:'{b}\n{c}家 ({d}%)'}},
+      selectedMode:'single',selectedOffset:30,
+      animationType:'scale',animationEasing:'elasticOut',animationDuration:800,
       data:jdata}]
   },true);
   bindChartClick(chJ, p=>toggleDD('ddJudge', p.name));
@@ -933,7 +943,12 @@ function renderCharts(rows){
   chR?.setOption({
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
     legend:{bottom:0,itemWidth:9,itemHeight:9,textStyle:{fontSize:11}},
-    series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],label:{show:false},cursor:'pointer',data:rdata}]
+    series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],label:{show:false},cursor:'pointer',
+      emphasis:{itemStyle:{shadowBlur:15,shadowOffsetX:0,shadowColor:'rgba(0, 0, 0, 0.5)'},scale:true,scaleSize:30,
+        label:{show:true,position:'center',fontSize:16,fontWeight:'bold',formatter:'{b}\n{c}家 ({d}%)'}},
+      selectedMode:'single',selectedOffset:30,
+      animationType:'scale',animationEasing:'elasticOut',animationDuration:800,
+      data:rdata}]
   },true);
   bindChartClick(chR, p=>toggleDD('ddRisk', p.name));
 
@@ -946,7 +961,12 @@ function renderCharts(rows){
   chV?.setOption({
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
     legend:{bottom:0,itemWidth:9,itemHeight:9,textStyle:{fontSize:11}},
-    series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],label:{show:false},cursor:'pointer',data:vdata}]
+    series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],label:{show:false},cursor:'pointer',
+      emphasis:{itemStyle:{shadowBlur:15,shadowOffsetX:0,shadowColor:'rgba(0, 0, 0, 0.5)'},scale:true,scaleSize:30,
+        label:{show:true,position:'center',fontSize:16,fontWeight:'bold',formatter:'{b}\n{c}家 ({d}%)'}},
+      selectedMode:'single',selectedOffset:30,
+      animationType:'scale',animationEasing:'elasticOut',animationDuration:800,
+      data:vdata}]
   },true);
   bindChartClick(chV, p=>toggleDD('ddVer', p.name));
 
@@ -956,6 +976,7 @@ function renderCharts(rows){
   const stack = JUDGE_ORDER.filter(j=>mrows.some(c=>c.judge===j));
   const series = stack.map(j=>({
     name:j,type:'bar',stack:'a',cursor:'pointer',itemStyle:{color:JUDGE_COLOR[j]},
+    emphasis:{focus:'self',itemStyle:{shadowBlur:10,shadowColor:'rgba(0, 0, 0, 0.3)'}},
     data:mgrs.map(m=>mrows.filter(c=>c.mgr===m && c.judge===j).length)
   }));
   const chS = initChart('cMgrStack');
@@ -965,7 +986,8 @@ function renderCharts(rows){
     grid:{left:10,right:20,top:40,bottom:10,containLabel:true},
     xAxis:{type:'category',data:mgrs,axisLabel:{fontSize:11,interval:0,rotate:30}},
     yAxis:{type:'value',splitLine:{lineStyle:{color:'#f1f5f9'}}},
-    series
+    series,
+    animationType:'scale',animationEasing:'elasticOut',animationDuration:800
   },true);
   bindChartClick(chS, p=>{
     const m = p.name, j = p.seriesName;
@@ -984,8 +1006,11 @@ function renderCharts(rows){
     grid:{left:10,right:60,top:10,bottom:10,containLabel:true},
     xAxis:{type:'value',axisLabel:{formatter:v=>v>=10000?(v/10000)+'万':v,fontSize:10},splitLine:{lineStyle:{color:'#f1f5f9'}}},
     yAxis:{type:'category',data:msum.map(x=>x.m),axisLabel:{fontSize:11}},
-    series:[{type:'bar',data:msum.map(x=>({value:x.v,itemStyle:{color:C.green}})),
-      label:{show:true,position:'right',formatter:p=>fmtMoney(p.value),fontSize:10,color:'#64748b'}}]
+    series:[{type:'bar',cursor:'pointer',
+      emphasis:{focus:'self',itemStyle:{shadowBlur:10,shadowColor:'rgba(0, 0, 0, 0.3)'}},
+      data:msum.map(x=>({value:x.v,itemStyle:{color:C.green}})),
+      label:{show:true,position:'right',formatter:p=>fmtMoney(p.value),fontSize:10,color:'#64748b'}}],
+    animationType:'scale',animationEasing:'elasticOut',animationDuration:800
   },true);
   // 确保所有图表在容器尺寸变化后重新计算
   Object.values(charts).forEach(c=>c&&c.resize());
@@ -2105,6 +2130,17 @@ document.addEventListener('click', function(e){
   if(t && t.id === 'infoMask'){ closeInfo(); return; }
 }, true);
 document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeArchive(); closeInfo(); } });
+
+// 一键透视：同步当前筛选条件到效果下钻页面
+function openDrilldown(){
+  const params = new URLSearchParams();
+  if(state.mgr) params.set('mgr', state.mgr);
+  if(state.vers.length === 1) params.set('ver', state.vers[0]);
+  if(state.effects.length === 1) params.set('eff', state.effects[0]);
+  if(state.q) params.set('q', state.q);
+  const qs = params.toString();
+  window.open('drilldown.html' + (qs ? '?' + qs : ''), '_blank');
+}
 </script>
 </body>
 </html>

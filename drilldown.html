@@ -261,6 +261,16 @@ async function boot(){
     opts(DATA.map(c=>c.el)).forEach(x => $('fEff').add(new Option(x, x)));
     ['fMgr','fVer','fEff'].forEach(id => $(id).onchange = render);
     $('fQ').oninput = render;
+    // 从 URL 参数读取筛选条件（由 tianji.html 一键透视按钮传入）
+    const urlParams = new URLSearchParams(location.search);
+    const mgr = urlParams.get('mgr');
+    const ver = urlParams.get('ver');
+    const eff = urlParams.get('eff');
+    const q = urlParams.get('q');
+    if(mgr){ const opt = $('fMgr').querySelector(`option[value="${mgr}"]`); if(opt) $('fMgr').value = mgr; }
+    if(ver){ const opt = $('fVer').querySelector(`option[value="${ver}"]`); if(opt) $('fVer').value = ver; }
+    if(eff){ const opt = $('fEff').querySelector(`option[value="${eff}"]`); if(opt) $('fEff').value = eff; }
+    if(q) $('fQ').value = q;
     // 数据自检：缺精准率说明拿到的是旧数据
     const miss = DATA.filter(c=>c.prec==null && c.unlockRatio==null).length;
     if(miss / DATA.length > 0.8){
