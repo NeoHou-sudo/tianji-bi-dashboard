@@ -39,8 +39,6 @@ h1,h2,h3{font-weight:600}
 .btn.primary:hover{background:#2563eb}
 .spacer{flex:1}
 .count-tip{font-size:12px;color:var(--muted)}
-.cf-hide{display:none!important}
-#btnSnapshot,#btnArchive,#btnBatchGen{display:none!important}
 .fgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .fgroup > label{font-size:12px;color:var(--muted);white-space:nowrap}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -573,15 +571,7 @@ thead th{-webkit-user-drag:element}
 </div>
 
 <div id="biTip"></div>
-<script src="assets/config.js"></script>
-<script>
-// 数据源：默认向 /api/data.js 取（云端会校验登录，未登录只给空壳）；
-// 若 config.js 里配了 dataUrl（例如放 Cloudflare R2），则直接从该地址加载同一份 data.js。
-(function(){
-  var u = (window.BI_CONFIG && window.BI_CONFIG.dataUrl) || '/api/data.js';
-  document.write('<script src="' + u + '"><\/script>');
-})();
-</script>
+<script src="assets/data.js"></script>
 <div id="arcMask"></div>
 <div id="arcPanel">
   <div class="arc-head">
@@ -929,7 +919,9 @@ function renderCharts(rows){
     tooltip:{trigger:'item',formatter:'{b}: {c}家 ({d}%)<br>点击筛选（再点一次取消）'},
     legend:{bottom:0,itemWidth:9,itemHeight:9,textStyle:{fontSize:11}},
     series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],avoidLabelOverlap:true,
-      label:{show:false},cursor:'pointer',data:jdata}]
+      label:{show:false},cursor:'pointer',
+      emphasis:{itemStyle:{shadowBlur:10,shadowOffsetX:0,shadowColor:'rgba(0, 0, 0, 0.5)'},scale:true,scaleSize:8},
+      data:jdata}]
   },true);
   bindChartClick(chJ, p=>toggleDD('ddJudge', p.name));
 
@@ -1086,7 +1078,7 @@ try{
 }catch(e){}
 function renderTable(rows){
   const _cc = document.getElementById('colCount'); if(_cc) _cc.textContent = COLS.length;
-  document.getElementById('thead').innerHTML = '<th class="cf-hide" style="width:34px;cursor:default"></th>' + COLS.map(c=>{
+  document.getElementById('thead').innerHTML = '<th style="width:34px;cursor:default"><input type="checkbox" id="ckAll" title="全选当前筛选" style="cursor:pointer"></th>' + COLS.map(c=>{
     const arr = state.sortKey===c.k ? `<span class="arr">${state.sortDesc?'▼':'▲'}</span>` : '';
     const w = colW(c.k) ? ` style="width:${colW(c.k)}px"` : '';
     return `<th data-k="${c.k}" class="${c.n?'right':''}"${w}>${c.t}${arr}<span class="grip"></span></th>`;
@@ -1143,7 +1135,7 @@ function renderTable(rows){
       })()}</td>`,
     };
     const cells = COLS.map(col=> CELL[col.k] ? CELL[col.k]() : '').join('');
-    return `<tr><td class="cf-hide"></td>${cells}${isFullAccess() ? '<td><button class="mini" data-fix="'+c.id+'" onclick="void(0)">修正</button></td>' : ''}</tr>`;
+    return `<tr><td><input type="checkbox" class="rowck" data-name="${c.name.replace(/"/g,'')}" style="cursor:pointer"></td>${cells}${isFullAccess() ? '<td><button class="mini" data-fix="'+c.id+'">修正</button></td>' : ''}</tr>`;
   }).join('') : `<tr><td colspan="${COLS.length + 1 + (isFullAccess() ? 1 : 0)}" class="empty">没有符合条件的客户</td></tr>`;
   const _tc = document.getElementById('tblCount');
   _tc.innerHTML = '（' + odoSpan('tblN', sorted.length) + ' 条）';
@@ -1261,11 +1253,6 @@ function renderTable(rows){
   });
 }
 
-// CF override: fix button → downloadFix (no backend call)
-document.querySelectorAll('[data-fix]').forEach(btn=>{
-  const nc = D.customers.find(x=>String(x.id)===btn.dataset.fix);
-  if(nc) btn.onclick = (e)=>{ e.stopPropagation(); downloadFix(nc); };
-});
 function renderLegend(){
   document.getElementById('legendRow').innerHTML =
     JUDGE_ORDER.filter(j=>D.customers.some(c=>c.judge===j))
@@ -1366,14 +1353,10 @@ function fixPlanText(c){
 - 邮件触达：${(c.reachedEmail||0).toLocaleString('zh-CN')} 封（打开率 ${c.openRatio!=null?(c.openRatio*100).toFixed(1)+'%':'—'}）
 - 真实询盘（不含 WhatsApp）：${c.nonWaInq||0} 条
 
-## 三、问题诊断
-主要问题：**${stripParen(c.diag)}**
-${tags.length>1?`问题链条：${tags.map(stripParen).join(' → ')}（越靠前越上游，下游问题多由上游导致，建议先解上游）`:''}
-
-## 四、优化建议
+## 三、优化建议
 ${fixes}
 
-## 五、本次可交付物（成品文件）
+## 四、本次可交付物（成品文件）
 ${needs.map(n=>{
   if(n.includes('2.5')) return '- 2.5（Zoe）配词方案 → 格式：xlsx';
   if(n.includes('3.0')) return '- 3.0（OntoZ）配词方案 → 格式：txt';
@@ -1523,29 +1506,6 @@ document.addEventListener('click', (e)=>{
     if(tp) tp.scrollIntoView({behavior:'smooth'});
   }
 });
-
-// ===== 云端版：这些接口依赖本机服务，这里直接给占位结果，避免报错 =====
-(function(){
-  var LOCAL_ONLY = ['/api/status','/api/refresh','/api/history','/api/batch',
-                    '/api/fix','/api/fix_only','/api/download','/api/file'];
-  var _f = window.fetch.bind(window);
-  window.fetch = function(u, o){
-    try{
-      var s = (typeof u === 'string') ? u : ((u && u.url) || '');
-      var path = s.split('?')[0];
-      for(var i=0;i<LOCAL_ONLY.length;i++){
-        if(path.indexOf(LOCAL_ONLY[i]) >= 0){
-          var body = {ok:false, error:'云端只读版未启用该功能，请在本机看板操作', readonly:true};
-          if(path.slice(-19) === '/api/refresh/status') body = {ok:true, running:false, finished:false, progress:null, changed:false};
-          if(path.slice(-12) === '/api/history')        body = {ok:true, records:[]};
-          return Promise.resolve(new Response(JSON.stringify(body),
-            {status:200, headers:{'Content-Type':'application/json'}}));
-        }
-      }
-    }catch(e){}
-    return _f.apply(window, arguments);
-  };
-})();
 
 // ===== 登录逻辑 =====
 let LOGIN_USER = null;
