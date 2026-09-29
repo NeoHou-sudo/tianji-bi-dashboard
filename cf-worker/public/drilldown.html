@@ -198,7 +198,7 @@ function cell(c, col){
     const col2 = ratio >= 0.6 ? '#10b981' : (ratio >= 0.3 ? '#f59e0b' : '#ef4444');
     const balTxt = '¥' + Math.round(bal).toLocaleString('zh-CN');
     const totalTxt = '¥' + Math.round(total).toLocaleString('zh-CN');
-    return `<td class="left"><span class="balbar"><i style="width:${pct}%;background:${col2}"></i></span><span class="baltxt">${balTxt} / ${totalTxt}</span></td>`;
+    return `<td class="left"><span class="balbar"><i style="width:${pct}%;background:${col2}"></i></span><span class="baltxt"><b style="color:${col2}">${pct}%</b> ${balTxt}/${totalTxt}</span></td>`;
   }
   return `<td class="${col.w==='right'?'right':''}${col.k==='name'?' name':''}">${v}</td>`;
 }
@@ -224,6 +224,10 @@ function rows(){
   r.sort((a,b)=>{
     let x=a[sortKey], y=b[sortKey];
     if(sortKey==='el'){ x=rank(x); y=rank(y); }
+    else if(sortKey==='balanceBar'){
+      const _r = c => { const bb=Number(c.cnyLeft)||0, uu=Number(c.cnyUsed)||0, tt=bb+uu; return tt>0 ? Math.max(0,bb/tt) : (bb>0?1:0); };
+      x = _r(a); y = _r(b);
+    }
     else if(typeof x==='number' || typeof y==='number'){ x=Number(x)||0; y=Number(y)||0; }
     else { x=String(x==null?'':x); y=String(y==null?'':y); }
     if(x<y) return sortDesc?1:-1;
@@ -266,7 +270,7 @@ function exportCSV(){
   // 完整导出
   const val = (c,col)=>{
     if(col.k==='prec')  return c.prec==null ? '' : c.prec + '%';
-    if(col.k==='balanceBar'){ const _bal=Number(c.cnyLeft)||0, _used=Number(c.cnyUsed)||0, _tot=_bal+_used; return '¥'+Math.round(_bal).toLocaleString('zh-CN') + '/' + (_tot>0?'¥'+Math.round(_tot).toLocaleString('zh-CN'):'—'); }
+    if(col.k==='balanceBar'){ const _bal=Number(c.cnyLeft)||0, _used=Number(c.cnyUsed)||0, _tot=_bal+_used, _rt=_tot>0?Math.max(0,_bal/_tot):0; return Math.round(_rt*100)+'% · ¥'+Math.round(_bal).toLocaleString('zh-CN') + '/' + (_tot>0?'¥'+Math.round(_tot).toLocaleString('zh-CN'):'—'); }
     if(col.pct===100)   return c[col.k]==null ? '' : (c[col.k]*100).toFixed(1) + '%';
     if(col.pct==='raw') return c[col.k]==null ? '' : c[col.k] + '%';
     return c[col.k]==null ? '' : c[col.k];
