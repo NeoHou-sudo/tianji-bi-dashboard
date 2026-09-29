@@ -7,7 +7,7 @@
 <style>
   :root{--border:#e6ebf2;--muted:#64748b;--blue:#2563eb;--green:#10b981;--orange:#f59e0b;--red:#ef4444}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f7fb;color:#0f172a}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#f4f7fb;color:#0f172a}
   .wrap{max-width:1500px;margin:0 auto;padding:22px 20px 60px}
   h1{font-size:20px;margin-bottom:4px}
   .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
@@ -35,6 +35,10 @@
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
   .warnbar{display:none;margin-bottom:14px;padding:11px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;line-height:1.6}
   .warnbar.show{display:block}
+  .syncbar{display:none;margin-bottom:14px;padding:11px 14px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;line-height:1.6}
+  .syncbar.show{display:block}
+  .syncbar a{color:#1d4ed8;font-weight:600;text-decoration:none}
+  .syncbar a:hover{text-decoration:underline}
   #wm{position:fixed;inset:0;z-index:9000;pointer-events:none;overflow:hidden;display:none}
   .balbar{display:inline-block;width:90px;height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden;vertical-align:middle;margin-right:6px}
   .balbar i{display:block;height:100%;border-radius:4px;transition:width .3s}
@@ -86,6 +90,7 @@
   <div class="sub">天玑 · 售后看板 · 独立下钻页（数据与主页同源，仅展示效果类指标）</div>
 
   <div class="warnbar" id="warn"></div>
+  <div class="syncbar" id="syncbar"></div>
 
   <div class="bar">
     <label>客户成功经理</label>
@@ -157,6 +162,8 @@ const COLS = [
 const HIDE = ['未分配','李嘉洲','漠鹰'];
 let DATA = [], sortKey = 'prec', sortDesc = true;
 const $ = id => document.getElementById(id);
+// 主页「一键透视」同步来的筛选条件（多选为数组，与主页 filtered() 同规则）
+const SYNC = { mgr:'', ver:[], eff:[], judge:[], risk:[], status:[], expiry:[], diag:[], q:'' };
 
 function rank(v){ if(v==null||v==='') return null; const s=String(v); return s.indexOf('C')>=0?2:(s.indexOf('D')>=0?3:(s.indexOf('B')>=0?1:0)); }
 
@@ -198,6 +205,17 @@ function cell(c, col){
 function rows(){
   const m = $('fMgr').value, v = $('fVer').value, e = $('fEff').value, q = ($('fQ').value||'').toLowerCase();
   let r = DATA.filter(c => !HIDE.some(h => (c.mgr||'').indexOf(h) >= 0));
+  // 主页同步筛选（与主页 filtered() 同规则：含容错 et→'未测算'、ver→'未知'、diag 链）
+  if(SYNC.mgr) r = r.filter(c => c.mgr === SYNC.mgr);
+  if(SYNC.ver.length) r = r.filter(c => SYNC.ver.includes(c.ver || '未知'));
+  if(SYNC.eff.length) r = r.filter(c => SYNC.eff.includes(c.el));
+  if(SYNC.judge.length) r = r.filter(c => SYNC.judge.includes(c.judge));
+  if(SYNC.risk.length) r = r.filter(c => SYNC.risk.includes(c.risk));
+  if(SYNC.status.length) r = r.filter(c => SYNC.status.includes(c.status));
+  if(SYNC.expiry.length) r = r.filter(c => SYNC.expiry.includes(c.et || '未测算'));
+  if(SYNC.diag.length) r = r.filter(c => SYNC.diag.some(d => (c.dt || [c.diag]).includes(d)));
+  if(SYNC.q) r = r.filter(c => (c.name||'').toLowerCase().includes(SYNC.q.toLowerCase()) || (c.catCn||'').toLowerCase().includes(SYNC.q.toLowerCase()));
+  // 本页筛选栏（在同步条件之上叠加）
   if(m) r = r.filter(c => c.mgr === m);
   if(v) r = r.filter(c => (c.ver||'') === v);
   if(e) r = r.filter(c => (c.el||'') === e);
@@ -293,16 +311,41 @@ async function boot(){
     opts(DATA.map(c=>c.el)).forEach(x => $('fEff').add(new Option(x, x)));
     ['fMgr','fVer','fEff'].forEach(id => $(id).onchange = render);
     $('fQ').oninput = render;
-    // 从 URL 参数读取筛选条件（由 tianji.html 一键透视按钮传入）
+    // 从 URL 参数读取筛选条件（由看板「📊 效果下钻 / 📊 同步当前筛选」按钮传入）
     const urlParams = new URLSearchParams(location.search);
     const mgr = urlParams.get('mgr');
-    const ver = urlParams.get('ver');
-    const eff = urlParams.get('eff');
+    const verAll = urlParams.getAll('ver');
+    const effAll = urlParams.getAll('eff');
     const q = urlParams.get('q');
+    SYNC.mgr = mgr || '';
+    SYNC.ver = verAll;
+    SYNC.eff = effAll;
+    SYNC.judge = urlParams.getAll('judge');
+    SYNC.risk = urlParams.getAll('risk');
+    SYNC.status = urlParams.getAll('status');
+    SYNC.expiry = urlParams.getAll('expiry');
+    SYNC.diag = urlParams.getAll('diag');
+    SYNC.q = q || '';
     if(mgr){ const opt = $('fMgr').querySelector(`option[value="${mgr}"]`); if(opt) $('fMgr').value = mgr; }
-    if(ver){ const opt = $('fVer').querySelector(`option[value="${ver}"]`); if(opt) $('fVer').value = ver; }
-    if(eff){ const opt = $('fEff').querySelector(`option[value="${eff}"]`); if(opt) $('fEff').value = eff; }
+    if(verAll.length === 1){ const opt = $('fVer').querySelector(`option[value="${verAll[0]}"]`); if(opt) $('fVer').value = verAll[0]; }
+    if(effAll.length === 1){ const opt = $('fEff').querySelector(`option[value="${effAll[0]}"]`); if(opt) $('fEff').value = effAll[0]; }
     if(q) $('fQ').value = q;
+    // 同步筛选提示条（展示主页带过来的条件，可一键清除）
+    const parts = [];
+    if(SYNC.mgr) parts.push('经理：' + SYNC.mgr);
+    if(SYNC.ver.length) parts.push('版本：' + SYNC.ver.join('/'));
+    if(SYNC.eff.length) parts.push('效果评级：' + SYNC.eff.join('/'));
+    if(SYNC.judge.length) parts.push('续费判断：' + SYNC.judge.join('/'));
+    if(SYNC.risk.length) parts.push('风险等级：' + SYNC.risk.join('/'));
+    if(SYNC.status.length) parts.push('服务状态：' + SYNC.status.join('/'));
+    if(SYNC.expiry.length) parts.push('到期类型：' + SYNC.expiry.join('/'));
+    if(SYNC.diag.length) parts.push('问题诊断：' + SYNC.diag.join('/'));
+    if(SYNC.q) parts.push('关键词：' + SYNC.q);
+    if(parts.length){
+      const sb = $('syncbar');
+      sb.className = 'syncbar show';
+      sb.innerHTML = '📌 已从看板同步筛选：' + parts.join('　') + '　<a href="drilldown.html">✕ 清除</a>';
+    }
     // 数据自检：缺精准率说明拿到的是旧数据
     const miss = DATA.filter(c=>c.prec==null && c.unlockRatio==null).length;
     if(miss / DATA.length > 0.8){
